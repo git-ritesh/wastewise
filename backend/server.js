@@ -13,8 +13,31 @@ connectDB();
 const app = express();
 
 // Middleware
+const defaultAllowedOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173'
+];
+
+const envAllowedOrigins = [
+  process.env.CLIENT_URL,
+  ...(process.env.CLIENT_URLS || '').split(',').map(origin => origin.trim())
+].filter(Boolean);
+
+const allowedOrigins = [...new Set([...defaultAllowedOrigins, ...envAllowedOrigins])];
+
 app.use(cors({
-  origin: '*', 
+  origin: (origin, callback) => {
+    // Allow server-to-server calls and tools with no Origin header.
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
   credentials: true
 }));
 app.use((req, res, next) => {
