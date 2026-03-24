@@ -4,6 +4,7 @@ import { useAuth } from './AuthContext.jsx';
 import api from '../services/api.js';
 
 const NotificationContext = createContext();
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 
 export const useNotification = () => useContext(NotificationContext);
 
@@ -16,7 +17,7 @@ export const NotificationProvider = ({ children }) => {
   // Initialize Socket.io
   useEffect(() => {
     if (isAuthenticated && user) {
-      const newSocket = io('http://localhost:5000'); // Ensure this matches backend URL
+      const newSocket = io(SOCKET_URL);
       
       newSocket.on('connect', () => {
         console.log('Socket connected');
