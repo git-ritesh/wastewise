@@ -49,9 +49,6 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve uploaded files statically
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
 // Routes
 app.use('/api/auth', require('./routes/authRoutes.js'));
 app.use('/api/dashboard', require('./routes/dashboardRoutes.js'));

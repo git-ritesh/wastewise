@@ -1,9 +1,8 @@
 const express = require('express');
-const path = require('path');
 const router = express.Router();
 
 const { protect } = require('../middleware/auth.js');
-const { upload, handleMulterError } = require('../middleware/upload.js');
+const { upload, handleMulterError } = require('../middleware/uploadCloudinary.js');
 
 // @desc    Upload images
 // @route   POST /api/upload
@@ -17,11 +16,11 @@ router.post('/', protect, upload.array('images', 5), handleMulterError, (req, re
       });
     }
 
-    // Generate URLs for uploaded files
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    // Generate URLs for uploaded files (Cloudinary secure URLs)
     const fileUrls = req.files.map(file => ({
       filename: file.filename,
-      url: `${baseUrl}/uploads/${file.filename}`,
+      url: file.secure_url,
+      public_id: file.public_id,
       size: file.size,
       mimetype: file.mimetype
     }));
@@ -55,8 +54,8 @@ router.post('/single', protect, upload.single('image'), handleMulterError, (req,
       });
     }
 
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const fileUrl = `${baseUrl}/uploads/${req.file.filename}`;
+    // Use Cloudinary secure URL
+    const fileUrl = req.file.secure_url;
 
     res.status(200).json({
       success: true,
@@ -64,6 +63,7 @@ router.post('/single', protect, upload.single('image'), handleMulterError, (req,
       data: {
         filename: req.file.filename,
         url: fileUrl,
+        public_id: req.file.public_id,
         size: req.file.size,
         mimetype: req.file.mimetype
       }
