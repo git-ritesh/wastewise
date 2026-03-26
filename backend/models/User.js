@@ -67,6 +67,16 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Auto-delete accounts that remain unverified beyond TTL window.
+const unverifiedTtlSeconds = (parseInt(process.env.UNVERIFIED_ACCOUNT_TTL_MINUTES || '30', 10) || 30) * 60;
+userSchema.index(
+  { createdAt: 1 },
+  {
+    expireAfterSeconds: unverifiedTtlSeconds,
+    partialFilterExpression: { isVerified: false, role: 'user' }
+  }
+);
+
 // Hash password before saving
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) {

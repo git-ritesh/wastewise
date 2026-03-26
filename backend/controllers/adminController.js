@@ -370,11 +370,78 @@ const getAdminStats = async (req, res) => {
   }
 };
 
+// @desc    Get all users
+// @route   GET /api/admin/users
+// @access  Admin only
+const getAllUsers = async (req, res) => {
+  try {
+    const { role } = req.query;
+    const query = {};
+    if (role && ['admin', 'collector', 'user'].includes(role)) {
+      query.role = role;
+    }
+
+    const users = await User.find(query)
+      .select('name email phone role isVerified rewardPoints createdAt')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: users
+    });
+  } catch (error) {
+    console.error('Get users error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching users'
+    });
+  }
+};
+
+// @desc    Delete any user
+// @route   DELETE /api/admin/users/:id
+// @access  Admin only
+const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (req.user.id === id) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot delete your own admin account'
+      });
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    await User.deleteOne({ _id: id });
+
+    res.status(200).json({
+      success: true,
+      message: 'User deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting user'
+    });
+  }
+};
+
 module.exports = {
   getAllReports,
   getReportDetails,
   getCollectors,
   updateReportStatus,
   rejectReport,
-  getAdminStats
+  getAdminStats,
+  getAllUsers,
+  deleteUser
 };

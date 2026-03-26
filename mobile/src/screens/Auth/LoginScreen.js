@@ -15,15 +15,16 @@ import {
 import { useDispatch } from 'react-redux';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { LogIn, Mail, Lock, ArrowRight } from 'lucide-react-native';
+import { Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react-native';
 import { login } from '../../redux/authSlice';
-import { COLORS } from '../../utils/constants';
+import { COLORS, BASE_URL } from '../../utils/constants';
 
 const { width } = Dimensions.get('window');
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const dispatch = useDispatch();
 
@@ -114,9 +115,12 @@ const LoginScreen = ({ navigation }) => {
                 placeholder="Password"
                 value={password}
                 onChangeText={setPassword}
-                secureTextEntry
+                secureTextEntry={!showPassword}
                 placeholderTextColor="#94A3B8"
               />
+              <TouchableOpacity onPress={() => setShowPassword(prev => !prev)}>
+                {showPassword ? <EyeOff size={20} color="#64748B" /> : <Eye size={20} color="#64748B" />}
+              </TouchableOpacity>
             </View>
 
             <TouchableOpacity 

@@ -25,6 +25,7 @@ const ReportForm = ({ onSubmit, onCancel }) => {
   const [timestamp] = useState(new Date());
   
   const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
 
   const wasteTypes = [
     { value: 'household', label: 'Household Waste', icon: '🏠', points: 10 },
@@ -247,13 +248,23 @@ const ReportForm = ({ onSubmit, onCancel }) => {
           
           <div className="image-upload-area">
             {imagePreviews.length < 5 && (
-              <div 
-                className="upload-trigger"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <div className="upload-icon">📤</div>
-                <span>Click to upload images</span>
-                <span className="upload-hint">JPEG, PNG, GIF, WebP • Max 5MB each</span>
+              <div className="upload-trigger-group">
+                <div 
+                  className="upload-trigger"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <div className="upload-icon">📤</div>
+                  <span>Upload from device</span>
+                  <span className="upload-hint">JPEG, PNG, GIF, WebP • Max 5MB each</span>
+                </div>
+                <div
+                  className="upload-trigger capture-trigger"
+                  onClick={() => cameraInputRef.current?.click()}
+                >
+                  <div className="upload-icon">📸</div>
+                  <span>Capture photo</span>
+                  <span className="upload-hint">Use device camera directly</span>
+                </div>
               </div>
             )}
             
@@ -262,6 +273,14 @@ const ReportForm = ({ onSubmit, onCancel }) => {
               ref={fileInputRef}
               accept="image/*"
               multiple
+              onChange={handleImageSelect}
+              style={{ display: 'none' }}
+            />
+            <input
+              type="file"
+              ref={cameraInputRef}
+              accept="image/*"
+              capture="environment"
               onChange={handleImageSelect}
               style={{ display: 'none' }}
             />

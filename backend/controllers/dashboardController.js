@@ -159,8 +159,7 @@ const createReport = async (req, res) => {
     // Handle multiple images if uploaded
     let imageUrls = [];
     if (req.files && req.files.length > 0) {
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
-      imageUrls = req.files.map(file => `${baseUrl}/uploads/${file.filename}`);
+      imageUrls = req.files.map(file => file.secure_url || file.path || file.url).filter(Boolean);
     }
 
     const report = await GarbageReport.create({

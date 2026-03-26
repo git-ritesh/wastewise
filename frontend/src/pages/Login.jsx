@@ -10,6 +10,7 @@ const Login = () => {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const { login, clearError } = useAuth();
   const navigate = useNavigate();
@@ -41,7 +42,6 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage('');
     
     if (!validateForm()) return;
     
@@ -95,7 +95,7 @@ const Login = () => {
             <div className="input-wrapper">
               <span className="input-icon">🔒</span>
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 id="password"
                 name="password"
                 value={formData.password}
@@ -103,6 +103,14 @@ const Login = () => {
                 placeholder="Enter your password"
                 className={errors.password ? 'error' : ''}
               />
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() => setShowPassword(prev => !prev)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? '🙈' : '👁️'}
+              </button>
             </div>
             {errors.password && <span className="error-text">{errors.password}</span>}
           </div>

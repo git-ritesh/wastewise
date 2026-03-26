@@ -13,6 +13,8 @@ const Register = () => {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const { register } = useAuth();
   const navigate = useNavigate();
@@ -139,7 +141,7 @@ const Register = () => {
               <div className="input-wrapper">
                 <span className="input-icon">🔒</span>
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   id="password"
                   name="password"
                   value={formData.password}
@@ -147,6 +149,14 @@ const Register = () => {
                   placeholder="Create a password"
                   className={errors.password ? 'error' : ''}
                 />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowPassword(prev => !prev)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? '🙈' : '👁️'}
+                </button>
               </div>
               {errors.password && <span className="error-text">{errors.password}</span>}
             </div>
@@ -156,7 +166,7 @@ const Register = () => {
               <div className="input-wrapper">
                 <span className="input-icon">🔒</span>
                 <input
-                  type="password"
+                  type={showConfirmPassword ? 'text' : 'password'}
                   id="confirmPassword"
                   name="confirmPassword"
                   value={formData.confirmPassword}
@@ -164,6 +174,14 @@ const Register = () => {
                   placeholder="Confirm password"
                   className={errors.confirmPassword ? 'error' : ''}
                 />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowConfirmPassword(prev => !prev)}
+                  aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showConfirmPassword ? '🙈' : '👁️'}
+                </button>
               </div>
               {errors.confirmPassword && <span className="error-text">{errors.confirmPassword}</span>}
             </div>

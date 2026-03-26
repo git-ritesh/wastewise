@@ -8,7 +8,9 @@ const {
   getCollectors,
   updateReportStatus,
   rejectReport,
-  getAdminStats
+  getAdminStats,
+  getAllUsers,
+  deleteUser
 } = require('../controllers/adminController.js');
 const { createCollector } = require('../controllers/collectorController.js');
 const { protect } = require('../middleware/auth.js');
@@ -33,6 +35,10 @@ router.use(roleCheck('admin'));
 
 // Admin dashboard stats
 router.get('/stats', getAdminStats);
+
+// Users management
+router.get('/users', getAllUsers);
+router.delete('/users/:id', deleteUser);
 
 // Collectors management
 router.get('/collectors', getCollectors);

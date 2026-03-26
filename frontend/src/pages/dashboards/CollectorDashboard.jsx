@@ -14,6 +14,7 @@ const CollectorDashboard = () => {
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
 
   useEffect(() => {
     fetchTasks();
@@ -229,29 +230,52 @@ const CollectorDashboard = () => {
             <form onSubmit={submitCompletion} className="completion-form">
               <div className="form-group">
                 <label>Upload Proof Photo (Required)</label>
-                <div 
-                  className="file-upload-box"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  {file ? (
+                {!file ? (
+                  <div className="upload-trigger-group">
+                    <div 
+                      className="file-upload-box upload-trigger"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <div className="upload-placeholder">
+                        <span className="upload-icon">📤</span>
+                        <span>Upload from device</span>
+                        <span className="upload-hint">JPEG, PNG, GIF, WebP • Max 5MB</span>
+                      </div>
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileChange}
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                      />
+                    </div>
+                    <div 
+                      className="file-upload-box capture-trigger"
+                      onClick={() => cameraInputRef.current?.click()}
+                    >
+                      <div className="upload-placeholder">
+                        <span className="upload-icon">📸</span>
+                        <span>Capture photo</span>
+                        <span className="upload-hint">Use device camera directly</span>
+                      </div>
+                      <input
+                        type="file"
+                        ref={cameraInputRef}
+                        onChange={handleFileChange}
+                        accept="image/*"
+                        capture="environment"
+                        style={{ display: 'none' }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="file-upload-box">
                     <div className="file-preview">
                       <img src={URL.createObjectURL(file)} alt="Preview" />
                       <span>{file.name}</span>
                     </div>
-                  ) : (
-                    <div className="upload-placeholder">
-                      <span className="upload-icon">📷</span>
-                      <span>Click to take/upload photo</span>
-                    </div>
-                  )}
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileChange}
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                  />
-                </div>
+                  </div>
+                )}
               </div>
 
               <div className="form-group">

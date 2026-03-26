@@ -84,7 +84,9 @@ export const adminAPI = {
   updateReportStatus: (id, data) => api.patch(`/admin/reports/${id}/status`, data),
   rejectReport: (id, reason) => api.patch(`/admin/reports/${id}/reject`, { reason }),
   getCollectors: () => api.get('/admin/collectors'),
-  createCollector: (data) => api.post('/admin/collectors', data)
+  createCollector: (data) => api.post('/admin/collectors', data),
+  getUsers: (role) => api.get('/admin/users', { params: role ? { role } : {} }),
+  deleteUser: (id) => api.delete(`/admin/users/${id}`)
 };
 
 // Collector API calls

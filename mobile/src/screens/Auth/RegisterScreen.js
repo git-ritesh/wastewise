@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { User, Mail, Lock, Phone, ArrowLeft } from 'lucide-react-native';
+import { User, Mail, Lock, Phone, ArrowLeft, Eye, EyeOff } from 'lucide-react-native';
 import client from '../../api/client';
 import { COLORS } from '../../utils/constants';
 
@@ -21,6 +21,7 @@ const RegisterScreen = ({ navigation }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -159,11 +160,14 @@ const RegisterScreen = ({ navigation }) => {
                   placeholder="Password (min. 6 characters)" 
                   value={password} 
                   onChangeText={setPassword} 
-                  secureTextEntry 
+                  secureTextEntry={!showPassword} 
                   placeholderTextColor="#94A3B8"
                   returnKeyType="done"
                   onSubmitEditing={handleRegister}
                 />
+                <TouchableOpacity onPress={() => setShowPassword(prev => !prev)}>
+                  {showPassword ? <EyeOff size={20} color="#64748B" /> : <Eye size={20} color="#64748B" />}
+                </TouchableOpacity>
               </View>
 
               <TouchableOpacity 

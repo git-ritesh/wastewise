@@ -8,6 +8,7 @@ const AdminDashboard = () => {
   const [stats, setStats] = useState(null);
   const [reports, setReports] = useState([]);
   const [collectors, setCollectors] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
   const [selectedReport, setSelectedReport] = useState(null);
@@ -27,6 +28,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     fetchStats();
     fetchCollectors();
+    fetchUsers();
   }, []);
 
   useEffect(() => {
@@ -69,6 +71,15 @@ const AdminDashboard = () => {
     }
   };
 
+  const fetchUsers = async () => {
+    try {
+      const response = await adminAPI.getUsers();
+      setUsers(response.data.data || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
+  };
+
   const handleAssign = async (reportId, collectorId) => {
     setActionLoading(reportId);
     try {
@@ -107,6 +118,23 @@ const AdminDashboard = () => {
     } catch (error) {
       console.error('Error updating status:', error);
       alert(error.response?.data?.message || 'Error updating status');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeleteUser = async (userId, name) => {
+    const confirmed = window.confirm(`Delete user ${name}? This action cannot be undone.`);
+    if (!confirmed) return;
+
+    setActionLoading(userId);
+    try {
+      await adminAPI.deleteUser(userId);
+      fetchUsers();
+      fetchStats();
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      alert(error.response?.data?.message || 'Error deleting user');
     } finally {
       setActionLoading(null);
     }
@@ -377,6 +405,62 @@ const AdminDashboard = () => {
                 Next →
               </button>
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Users Management */}
+      <div className="reports-section users-section" style={{ marginTop: '2rem' }}>
+        <div className="section-header">
+          <h2>Users Management</h2>
+          <span className="user-count-badge">Total: {users.length}</span>
+        </div>
+
+        <div className="reports-table-container">
+          {users.length === 0 ? (
+            <div className="empty-state">
+              <span className="empty-icon">👥</span>
+              <p>No users found</p>
+            </div>
+          ) : (
+            <table className="reports-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Joined</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map(appUser => (
+                  <tr key={appUser._id} className={actionLoading === appUser._id ? 'row-loading' : ''}>
+                    <td>{appUser.name}</td>
+                    <td>{appUser.email}</td>
+                    <td>
+                      <span className="waste-type-badge">{appUser.role}</span>
+                    </td>
+                    <td>
+                      <span className={`status-badge ${appUser.isVerified ? 'status-green' : 'status-red'}`}>
+                        {appUser.isVerified ? 'Verified' : 'Unverified'}
+                      </span>
+                    </td>
+                    <td className="date-cell">{formatDate(appUser.createdAt)}</td>
+                    <td>
+                      <button
+                        className="btn btn-small btn-danger"
+                        onClick={() => handleDeleteUser(appUser._id, appUser.name)}
+                        disabled={actionLoading === appUser._id || appUser._id === user?.id}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
         </div>
       </div>

@@ -13,7 +13,7 @@ const {
 } = require('../controllers/dashboardController.js');
 const { protect } = require('../middleware/auth.js');
 const { roleCheck } = require('../middleware/roleCheck.js');
-const { upload } = require('../middleware/upload.js');
+const { upload, handleMulterError } = require('../middleware/uploadCloudinary.js');
 
 // Validation middleware
 const handleValidationErrors = (req, res, next) => {
@@ -78,7 +78,7 @@ router.patch('/profile', profileValidation, handleValidationErrors, updateProfil
 
 // Report routes
 router.get('/reports', getUserReports);
-router.post('/reports', upload.array('images', 5), parseFormData, reportValidation, handleValidationErrors, createReport);
+router.post('/reports', upload.array('images', 5), handleMulterError, parseFormData, reportValidation, handleValidationErrors, createReport);
 router.get('/reports/:id', getReport);
 router.patch('/reports/:id/cancel', cancelReport);
 

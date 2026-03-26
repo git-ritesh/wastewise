@@ -64,6 +64,18 @@
   gap: 1rem;
 }
 
+.upload-trigger-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .upload-trigger-group {
+    grid-template-columns: 1fr;
+  }
+}
+
 .upload-trigger {
   display: flex;
   flex-direction: column;
@@ -82,6 +94,15 @@
 .upload-trigger:hover {
   border-color: var(--primary);
   background: rgba(16, 185, 129, 0.05);
+}
+
+.capture-trigger {
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+.capture-trigger:hover {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.08);
 }
 
 .upload-icon {

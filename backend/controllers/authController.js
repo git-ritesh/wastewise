@@ -2,12 +2,28 @@ const User = require('../models/User.js');
 const generateToken = require('../utils/generateToken.js');
 const { sendOTPEmail } = require('../utils/emailService.js');
 
+const getUnverifiedExpiryDate = () => {
+  const ttlMinutes = parseInt(process.env.UNVERIFIED_ACCOUNT_TTL_MINUTES || '30', 10) || 30;
+  return new Date(Date.now() - ttlMinutes * 60 * 1000);
+};
+
+const purgeExpiredUnverifiedUsers = async () => {
+  const expiryDate = getUnverifiedExpiryDate();
+  await User.deleteMany({
+    role: 'user',
+    isVerified: false,
+    createdAt: { $lte: expiryDate }
+  });
+};
+
 // @desc    Register new user
 // @route   POST /api/auth/register
 // @access  Public
 const register = async (req, res) => {
   try {
     const { name, email, password, phone } = req.body;
+
+    await purgeExpiredUnverifiedUsers();
 
     // Check if user exists
     const userExists = await User.findOne({ email });
@@ -115,13 +131,15 @@ const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    await purgeExpiredUnverifiedUsers();
+
     // Find user and include password
     const user = await User.findOne({ email }).select('+password');
 
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: 'No user exists with this email'
       });
     }
 
@@ -130,7 +148,7 @@ const login = async (req, res) => {
     if (!isMatch) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: 'Incorrect password'
       });
     }
 
@@ -175,6 +193,8 @@ const login = async (req, res) => {
 const resendOTP = async (req, res) => {
   try {
     const { email } = req.body;
+
+    await purgeExpiredUnverifiedUsers();
 
     const user = await User.findOne({ email });
     
