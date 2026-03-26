@@ -75,6 +75,16 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
+  const clearAllNotifications = async () => {
+    try {
+      await api.delete('/notifications/clear-all');
+      setNotifications([]);
+      setUnreadCount(0);
+    } catch (error) {
+      console.error('Error clearing notifications:', error);
+    }
+  };
+
   return (
     <NotificationContext.Provider value={{
       socket,
@@ -82,6 +92,7 @@ export const NotificationProvider = ({ children }) => {
       unreadCount,
       markAsRead,
       markAllAsRead,
+      clearAllNotifications,
       fetchNotifications
     }}>
       {children}

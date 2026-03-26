@@ -433,10 +433,9 @@ const completeTask = async (req, res) => {
       });
     }
 
-    // Handle file upload
+    // Handle file upload (Cloudinary URL)
     if (req.file) {
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
-      task.completionProof = `${baseUrl}/uploads/${req.file.filename}`;
+      task.completionProof = req.file.secure_url || req.file.path || req.file.url;
     }
 
     task.status = 'completed';

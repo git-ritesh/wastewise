@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import './NotificationCenter.css';
 
 const NotificationCenter = () => {
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, clearAllNotifications } = useNotification();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -66,11 +66,18 @@ const NotificationCenter = () => {
         <div className="notification-dropdown">
           <div className="notification-header">
             <h3>Notifications</h3>
-            {unreadCount > 0 && (
-              <button className="mark-all-read" onClick={markAllAsRead}>
-                Mark all read
-              </button>
-            )}
+            <div className="header-actions">
+              {unreadCount > 0 && (
+                <button className="mark-all-read" onClick={markAllAsRead} title="Mark all as read">
+                  Mark all read
+                </button>
+              )}
+              {notifications.length > 0 && (
+                <button className="clear-all" onClick={clearAllNotifications} title="Clear all notifications">
+                  Clear all
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="notification-list">

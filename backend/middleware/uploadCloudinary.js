@@ -9,13 +9,17 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// Configure Cloudinary storage
+// Configure Cloudinary storage with compression
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: 'wastewise/uploads',
     allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
     resource_type: 'auto',
+    quality: 'auto', // Auto quality optimization
+    fetch_format: 'auto', // Serve optimal format based on client
+    width: 1200, // Max width for responsive sizing
+    crop: 'limit', // Don't upscale, only downscale if needed
     public_id: (req, file) => {
       // Generate unique public_id: userId-timestamp
       const uniqueSuffix = `${req.user?.id || 'anon'}-${Date.now()}`;

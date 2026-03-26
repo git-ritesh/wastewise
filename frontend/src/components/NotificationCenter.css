@@ -65,6 +65,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .notification-header h3 {
@@ -74,16 +76,36 @@
   color: var(--text-primary);
 }
 
-.mark-all-read {
+.header-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.mark-all-read,
+.clear-all {
   background: none;
   border: none;
-  color: var(--primary-color, #10b981);
   font-size: 0.8rem;
   cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.mark-all-read {
+  color: var(--primary-color, #10b981);
 }
 
 .mark-all-read:hover {
-  text-decoration: underline;
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.clear-all {
+  color: #ef4444;
+}
+
+.clear-all:hover {
+  background: rgba(239, 68, 68, 0.1);
 }
 
 .notification-list {
