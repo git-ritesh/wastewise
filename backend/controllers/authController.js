@@ -137,7 +137,7 @@ const login = async (req, res) => {
     const user = await User.findOne({ email }).select('+password');
 
     if (!user) {
-      return res.status(401).json({
+      return res.status(400).json({
         success: false,
         message: 'No user exists with this email'
       });
@@ -146,7 +146,7 @@ const login = async (req, res) => {
     // Check password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      return res.status(401).json({
+      return res.status(400).json({
         success: false,
         message: 'Incorrect password'
       });
@@ -154,7 +154,7 @@ const login = async (req, res) => {
 
     // Check if verified
     if (!user.isVerified) {
-      return res.status(401).json({
+      return res.status(400).json({
         success: false,
         message: 'Please verify your email before logging in',
         needsVerification: true

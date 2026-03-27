@@ -157,8 +157,9 @@ const ReportForm = ({ onSubmit, onCancel }) => {
     if (!formData.description.trim()) newErrors.description = 'Description is required';
     if (formData.description.length > 500) newErrors.description = 'Description cannot exceed 500 characters';
     if (!formData.location.address.trim()) newErrors.address = 'Address is required';
-    if (!formData.location.coordinates.lat || !formData.location.coordinates.lng) {
-      newErrors.address = 'Please enable location access or click "Capture Location" to get GPS coordinates';
+    // Check if coordinates are actually null/undefined (0 is valid)
+    if (formData.location.coordinates.lat == null || formData.location.coordinates.lng == null) {
+      newErrors.address = 'Please click "Capture Location" to enable location for this report';
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;

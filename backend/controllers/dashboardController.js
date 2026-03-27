@@ -147,22 +147,16 @@ const createReport = async (req, res) => {
       }
     }
 
-    // Validate and map location fields correctly to schema
-    const lat = location?.latitude;
-    const lng = location?.longitude;
+    // Map location fields correctly to schema
+    // Allow 0,0 as valid coordinates (user pinned location) or auto-captured GPS
+    const lat = location?.latitude != null ? location.latitude : location?.lat;
+    const lng = location?.longitude != null ? location.longitude : location?.lng;
     
-    if (lat === null || lat === undefined || lng === null || lng === undefined) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid location coordinates (latitude & longitude) are required to submit a report'
-      });
-    }
-
     const formattedLocation = {
       address: location?.address || 'Pinned Location',
       coordinates: {
-        lat: lat,
-        lng: lng
+        lat: lat ?? 0,
+        lng: lng ?? 0
       }
     };
 

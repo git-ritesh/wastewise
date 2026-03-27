@@ -35,8 +35,13 @@ const Login = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    // Clear field-level validation errors
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+    // Clear previous login error when user changes email or password (trying a new attempt)
+    if ((name === 'email' || name === 'password') && message) {
+      setMessage('');
     }
   };
 
@@ -48,9 +53,10 @@ const Login = () => {
     setLoading(true);
     try {
       const result = await login(formData.email, formData.password);
+      setMessage(''); // Clear error message only on successful login
       navigate(result.dashboardPath);
     } catch (err) {
-      setMessage(err.message);
+      setMessage(err.message); // Show error and keep it persistent
     } finally {
       setLoading(false);
     }
