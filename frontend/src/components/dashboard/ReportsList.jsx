@@ -32,6 +32,17 @@ const ReportsList = ({ reports, activeTab, onTabChange, onCancel, pagination, on
     });
   };
 
+  const formatDateTime = (date) => {
+    if (!date) return 'N/A';
+    return new Date(date).toLocaleString('en-US', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    });
+  };
+
   return (
     <div className="reports-list-container">
       <div className="reports-header">
@@ -94,6 +105,37 @@ const ReportsList = ({ reports, activeTab, onTabChange, onCancel, pagination, on
                 {report.rewardPointsEarned > 0 && (
                   <div className="reward-earned">
                     <span>🏆 +{report.rewardPointsEarned} points earned</span>
+                  </div>
+                )}
+                {report.status === 'completed' && (
+                  <div className="completion-block">
+                    <div className="completion-header">Pickup Proof</div>
+                    <div className="completion-meta">
+                      <span>Completed: {formatDateTime(report.completedAt)}</span>
+                    </div>
+                    {report.completionNote && (
+                      <p className="completion-note">{report.completionNote}</p>
+                    )}
+                    {report.completionProof ? (
+                      <div className="completion-proof">
+                        <a
+                          href={report.completionProof}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="proof-link"
+                        >
+                          View full-size proof
+                        </a>
+                        <img
+                          src={report.completionProof}
+                          alt={`Pickup proof for ${report.title}`}
+                          className="proof-image"
+                          loading="lazy"
+                        />
+                      </div>
+                    ) : (
+                      <p className="proof-missing">Proof image was not uploaded for this pickup.</p>
+                    )}
                   </div>
                 )}
               </div>
