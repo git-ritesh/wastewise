@@ -379,11 +379,22 @@ const getCollectorTasks = async (req, res) => {
       query.status = { $in: ['assigned', 'in_progress'] };
     }
 
-    const tasks = await GarbageReport.find(query)
+    let tasks = await GarbageReport.find(query)
       .populate('user', 'name phone')
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(parseInt(limit));
+
+    // Ensure all tasks have location data (for backward compatibility)
+    tasks = tasks.map(task => {
+      if (!task.location) {
+        task.location = { address: 'No address provided', coordinates: { lat: 0, lng: 0 } };
+      }
+      if (!task.location.coordinates) {
+        task.location.coordinates = { lat: 0, lng: 0 };
+      }
+      return task;
+    });
 
     const total = await GarbageReport.countDocuments(query);
 

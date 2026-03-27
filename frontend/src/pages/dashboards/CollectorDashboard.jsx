@@ -242,7 +242,7 @@ const CollectorDashboard = () => {
                     <button 
                       className="btn btn-outline"
                       onClick={() => handleOpenMap(task)}
-                      disabled={!task.location?.coordinates?.lat}
+                      disabled={task.location?.coordinates?.lat == null || task.location?.coordinates?.lng == null}
                     >
                       🗺️ Navigate
                     </button>
