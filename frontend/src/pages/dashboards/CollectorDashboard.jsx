@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { collectorAPI } from '../../services/api';
+import CollectorLiveMap from '../../components/dashboard/CollectorLiveMap';
 import './CollectorDashboard.css';
 
 const CollectorDashboard = () => {
@@ -10,15 +11,28 @@ const CollectorDashboard = () => {
   const [filter, setFilter] = useState('pending'); // pending (assigned/in_progress) or completed
   const [selectedTask, setSelectedTask] = useState(null);
   const [completionModal, setCompletionModal] = useState(null);
+  const [navigationTask, setNavigationTask] = useState(null);
+  const [currentPosition, setCurrentPosition] = useState(null);
+  const [isTracking, setIsTracking] = useState(false);
+  const [trackingError, setTrackingError] = useState('');
   const [file, setFile] = useState(null);
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
+  const watchIdRef = useRef(null);
 
   useEffect(() => {
     fetchTasks();
   }, [filter]);
+
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current !== null && navigator.geolocation) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+    };
+  }, []);
 
   const fetchTasks = async () => {
     setLoading(true);
@@ -33,11 +47,56 @@ const CollectorDashboard = () => {
     }
   };
 
-  const handleOpenMap = (location) => {
-    if (!location?.coordinates?.lat) return;
-    const { lat, lng } = location.coordinates;
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-    window.open(url, '_blank');
+  const stopTracking = () => {
+    if (watchIdRef.current !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    setIsTracking(false);
+  };
+
+  const startTracking = () => {
+    if (!navigator.geolocation) {
+      setTrackingError('Geolocation is not supported by this browser.');
+      return;
+    }
+
+    setTrackingError('');
+    setIsTracking(true);
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        setCurrentPosition({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          accuracy: position.coords.accuracy
+        });
+      },
+      (error) => {
+        setTrackingError(error.message || 'Failed to get live location.');
+        setIsTracking(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 3000
+      }
+    );
+  };
+
+  const handleOpenMap = (task) => {
+    if (!task?.location?.coordinates?.lat) return;
+    setNavigationTask(task);
+    setCurrentPosition(null);
+    setTrackingError('');
+    startTracking();
+  };
+
+  const handleCloseNavigation = () => {
+    stopTracking();
+    setNavigationTask(null);
+    setCurrentPosition(null);
+    setTrackingError('');
   };
 
   const handleCompleteClick = (task) => {
@@ -182,7 +241,7 @@ const CollectorDashboard = () => {
                   <div className="task-actions">
                     <button 
                       className="btn btn-outline"
-                      onClick={() => handleOpenMap(task.location)}
+                      onClick={() => handleOpenMap(task)}
                       disabled={!task.location?.coordinates?.lat}
                     >
                       🗺️ Navigate
@@ -306,6 +365,69 @@ const CollectorDashboard = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Navigation Modal */}
+      {navigationTask && (
+        <div className="modal-overlay" onClick={handleCloseNavigation}>
+          <div className="modal-content navigation-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Live Navigation</h2>
+              <button className="modal-close" onClick={handleCloseNavigation}>×</button>
+            </div>
+
+            <div className="navigation-meta">
+              <p><strong>Task:</strong> {navigationTask.title}</p>
+              <p><strong>Destination:</strong> {navigationTask.location?.address}</p>
+              {currentPosition && (
+                <p>
+                  <strong>Live Position:</strong> {currentPosition.lat.toFixed(5)}, {currentPosition.lng.toFixed(5)}
+                  {' '} (±{Math.round(currentPosition.accuracy || 0)}m)
+                </p>
+              )}
+              {trackingError && <p className="tracking-error">⚠️ {trackingError}</p>}
+            </div>
+
+            <div className="navigation-map-wrap">
+              {navigationTask.location?.coordinates?.lat && navigationTask.location?.coordinates?.lng ? (
+                <CollectorLiveMap
+                  destination={{
+                    lat: navigationTask.location.coordinates.lat,
+                    lng: navigationTask.location.coordinates.lng
+                  }}
+                  currentPosition={currentPosition}
+                />
+              ) : (
+                <div className="navigation-map-fallback">Unable to load map route.</div>
+              )}
+            </div>
+
+            <div className="form-actions navigation-actions">
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={handleCloseNavigation}
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={isTracking ? stopTracking : startTracking}
+              >
+                {isTracking ? 'Stop Live Tracking' : 'Start Live Tracking'}
+              </button>
+              <a
+                className="btn btn-success"
+                href={`https://www.google.com/maps/dir/?api=1&destination=${navigationTask.location.coordinates.lat},${navigationTask.location.coordinates.lng}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open Full Maps
+              </a>
+            </div>
           </div>
         </div>
       )}
