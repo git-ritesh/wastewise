@@ -1,6 +1,8 @@
-/* ... existing imports */
+import { useEffect, useState } from 'react';
+import { rewardAPI } from '../../services/api';
+import './RewardsDashboard.css';
+
 const RewardsDashboard = () => {
-  const { user, login } = useAuth();
   const [history, setHistory] = useState([]);
   const [balance, setBalance] = useState(0);
   const [leaderboard, setLeaderboard] = useState([]);
