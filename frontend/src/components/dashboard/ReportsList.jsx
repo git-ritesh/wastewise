@@ -91,6 +91,20 @@ const ReportsList = ({ reports, activeTab, onTabChange, onCancel, pagination, on
                     <span className="collector-phone">📱 {report.assignedCollector.phone}</span>
                   </div>
                 )}
+                {report.status === 'completed' && report.completionProof && (
+                  <div className="completion-proof">
+                    <span className="completion-proof-label">📷 Proof by collector:</span>
+                    <a href={report.completionProof} target="_blank" rel="noreferrer" className="proof-link">
+                      <img
+                        src={report.completionProof}
+                        alt="Completion proof"
+                        className="proof-image"
+                        style={{ maxWidth: '100%', maxHeight: '180px', borderRadius: '8px', marginTop: '8px' }}
+                      />
+                      <span style={{ display: 'block', marginTop: '4px', fontSize: '0.87rem' }}>View full proof</span>
+                    </a>
+                  </div>
+                )}
                 {report.rewardPointsEarned > 0 && (
                   <div className="reward-earned">
                     <span>🏆 +{report.rewardPointsEarned} points earned</span>
