@@ -53,6 +53,7 @@ router.post('/collectors', [
 router.get('/reports', getAllReports);
 router.get('/reports/:id', getReportDetails);
 router.patch('/reports/:id/status', updateReportStatus);
+router.patch('/reports/:id/reject', rejectReport);
 // Redemption management
 router.get('/redemptions', require('../controllers/rewardController.js').getRedemptionRequests);
 router.patch('/redemptions/:id/status', require('../controllers/rewardController.js').processRedemption);

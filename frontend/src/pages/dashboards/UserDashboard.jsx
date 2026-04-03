@@ -19,6 +19,10 @@ const UserDashboard = () => {
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
 
   useEffect(() => {
+    console.log('👤 UserDashboard loaded, user role:', user?.role);
+  }, [user]);
+
+  useEffect(() => {
     fetchDashboardData();
     fetchReports();
     fetchLeaderboard();
@@ -60,11 +64,14 @@ const UserDashboard = () => {
 
   const handleCreateReport = async (reportData) => {
     try {
+      console.log('📤 Submitting report...');
       await dashboardAPI.createReport(reportData);
+      console.log('✅ Report created successfully');
       setShowCreateModal(false);
       fetchReports(activeTab);
       fetchDashboardData();
     } catch (error) {
+      console.error('❌ Report creation error:', error);
       throw error;
     }
   };

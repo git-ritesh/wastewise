@@ -195,16 +195,45 @@ const ReportForm = ({ onSubmit, onCancel }) => {
         setUploadingImages(true);
         const files = imagePreviews.map(p => p.file);
         const uploadResponse = await uploadAPI.uploadImages(files);
-        imageUrls = uploadResponse.data.data.urls;
+        
+        console.log('📥 Upload response received:', uploadResponse.data);
+        
+        // Extract URLs from response - handle different response structures
+        if (uploadResponse.data?.data?.urls) {
+          imageUrls = uploadResponse.data.data.urls.filter(url => url !== null && url !== undefined);
+          console.log('✅ Extracted URLs from data.urls:', imageUrls);
+        } else if (uploadResponse.data?.urls) {
+          imageUrls = uploadResponse.data.urls.filter(url => url !== null && url !== undefined);
+          console.log('✅ Extracted URLs from urls:', imageUrls);
+        } else if (uploadResponse.data?.files && Array.isArray(uploadResponse.data.files)) {
+          imageUrls = uploadResponse.data.files
+            .map(f => f.url || f.secure_url || f.path)
+            .filter(url => url !== null && url !== undefined);
+          console.log('✅ Extracted URLs from files array:', imageUrls);
+        }
+        
+        if (imageUrls.length === 0) {
+          console.warn('⚠️ No valid URLs found in upload response!');
+          setMessage('Error: Upload succeeded but no image URLs returned. Check backend logs.');
+          setUploadingImages(false);
+          return;
+        }
+        
+        console.log('✅ Final image URLs to send:', imageUrls);
         setUploadingImages(false);
+      } else {
+        console.log('⚠️ No images selected');
       }
 
       // Submit report with image URLs
-      await onSubmit({
+      const reportData = {
         ...formData,
         images: imageUrls
-      });
+      };
+      console.log('📤 Sending report to backend:', reportData);
+      await onSubmit(reportData);
     } catch (error) {
+      console.error('❌ Error creating report:', error);
       setMessage(error.response?.data?.message || 'Error submitting report');
       setUploadingImages(false);
     } finally {

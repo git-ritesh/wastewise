@@ -24,6 +24,55 @@ const AdminDashboard = () => {
     page: 1
   });
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
+  const [rejectModal, setRejectModal] = useState({ open: false, reportId: null });
+  const [rejectReason, setRejectReason] = useState('');
+
+  const normalizeImageUrls = (report) => {
+    if (!report) return [];
+
+    const queue = [
+      report.images,
+      report.image,
+      report.imageUrls,
+      report.photos,
+      report.attachments,
+      report.files,
+      report.data?.files,
+      report.data?.urls,
+      report.data?.images
+    ];
+
+    const urls = [];
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (!current) continue;
+
+      if (typeof current === 'string') {
+        urls.push(current);
+        continue;
+      }
+
+      if (Array.isArray(current)) {
+        queue.push(...current);
+        continue;
+      }
+
+      if (typeof current === 'object') {
+        const directUrl = current.secure_url || current.url || current.path || current.src || current.location;
+        if (typeof directUrl === 'string' && directUrl.trim()) {
+          urls.push(directUrl.trim());
+        }
+
+        if (current.images) queue.push(current.images);
+        if (current.imageUrls) queue.push(current.imageUrls);
+        if (current.files) queue.push(current.files);
+        if (current.urls) queue.push(current.urls);
+        if (current.data) queue.push(current.data);
+      }
+    }
+
+    return [...new Set(urls.filter((u) => /^https?:\/\//i.test(u)))];
+  };
 
   useEffect(() => {
     fetchStats();
@@ -53,7 +102,11 @@ const AdminDashboard = () => {
         page: filters.page,
         limit: 10
       });
-      setReports(response.data.data.reports);
+      const normalizedReports = (response.data.data.reports || []).map((report) => ({
+        ...report,
+        images: normalizeImageUrls(report)
+      }));
+      setReports(normalizedReports);
       setPagination(response.data.data.pagination);
     } catch (error) {
       console.error('Error fetching reports:', error);
@@ -94,13 +147,24 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleReject = async (reportId) => {
-    const reason = prompt('Enter rejection reason (optional):');
-    setActionLoading(reportId);
+  const openRejectModal = (reportId) => {
+    setRejectModal({ open: true, reportId });
+    setRejectReason('');
+  };
+
+  const closeRejectModal = () => {
+    setRejectModal({ open: false, reportId: null });
+    setRejectReason('');
+  };
+
+  const handleRejectSubmit = async () => {
+    if (!rejectModal.reportId) return;
+    setActionLoading(rejectModal.reportId);
     try {
-      await adminAPI.rejectReport(reportId, reason);
+      await adminAPI.rejectReport(rejectModal.reportId, rejectReason);
       fetchReports();
       fetchStats();
+      closeRejectModal();
     } catch (error) {
       console.error('Error rejecting:', error);
       alert(error.response?.data?.message || 'Error rejecting report');
@@ -137,6 +201,23 @@ const AdminDashboard = () => {
       alert(error.response?.data?.message || 'Error deleting user');
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleOpenReportDetails = async (report) => {
+    try {
+      const response = await adminAPI.getReportDetails(report._id);
+      const detailedReport = response?.data?.data || report;
+      setSelectedReport({
+        ...detailedReport,
+        images: normalizeImageUrls(detailedReport)
+      });
+    } catch (error) {
+      console.error('Error fetching report details:', error);
+      setSelectedReport({
+        ...report,
+        images: normalizeImageUrls(report)
+      });
     }
   };
 
@@ -295,6 +376,7 @@ const AdminDashboard = () => {
                   <th>Report</th>
                   <th>User</th>
                   <th>Type</th>
+                  <th>Images</th>
                   <th>Status</th>
                   <th>Date</th>
                   <th>Actions</th>
@@ -307,7 +389,7 @@ const AdminDashboard = () => {
                       <div className="report-title">{report.title}</div>
                       <div className="report-address">{report.location?.address?.substring(0, 50)}...</div>
                       {report.images?.length > 0 && (
-                        <button 
+                        <button
                           className="view-images-btn"
                           onClick={() => setImagePreview(report.images)}
                         >
@@ -325,6 +407,29 @@ const AdminDashboard = () => {
                       <span className="waste-type-badge">
                         {wasteTypeLabels[report.wasteType]}
                       </span>
+                    </td>
+                    <td className="report-images-cell">
+                      {report.images?.length > 0 ? (
+                        <>
+                          <button
+                            type="button"
+                            className="report-thumbnail-btn"
+                            onClick={() => setImagePreview(report.images)}
+                            title="View submitted images"
+                          >
+                            <img src={report.images[0]} alt="Submitted garbage report" />
+                          </button>
+                          <button
+                            type="button"
+                            className="view-images-btn"
+                            onClick={() => setImagePreview(report.images)}
+                          >
+                            📷 {report.images.length} image(s)
+                          </button>
+                        </>
+                      ) : (
+                        <span className="no-images-badge">No image</span>
+                      )}
                     </td>
                     <td>
                       <span className={`status-badge status-${statusConfig[report.status]?.color}`}>
@@ -350,7 +455,7 @@ const AdminDashboard = () => {
                           </select>
                           <button
                             className="btn btn-small btn-danger"
-                            onClick={() => handleReject(report._id)}
+                            onClick={() => openRejectModal(report._id)}
                             disabled={actionLoading === report._id}
                           >
                             Reject
@@ -377,7 +482,7 @@ const AdminDashboard = () => {
                       )}
                       <button
                         className="btn btn-small btn-outline"
-                        onClick={() => setSelectedReport(report)}
+                        onClick={() => handleOpenReportDetails(report)}
                       >
                         View
                       </button>
@@ -465,6 +570,46 @@ const AdminDashboard = () => {
         </div>
       </div>
 
+      {/* Reject Modal */}
+      {rejectModal.open && (
+        <div className="modal-overlay" onClick={closeRejectModal}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <button className="modal-close" onClick={closeRejectModal}>×</button>
+            <h3>Reject Report</h3>
+            <p className="modal-subtitle">Are you sure you want to reject this report?</p>
+
+            <div className="form-group">
+              <label htmlFor="reject-reason">Rejection Reason (Optional)</label>
+              <textarea
+                id="reject-reason"
+                className="form-control"
+                rows={4}
+                placeholder="Enter the reason for rejecting this report..."
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+              />
+            </div>
+
+            <div className="modal-actions">
+              <button
+                className="btn btn-outline"
+                onClick={closeRejectModal}
+                disabled={actionLoading === rejectModal.reportId}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-danger"
+                onClick={handleRejectSubmit}
+                disabled={actionLoading === rejectModal.reportId}
+              >
+                {actionLoading === rejectModal.reportId ? 'Rejecting...' : 'Reject Report'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Image Preview Modal */}
       {imagePreview && (
         <div className="modal-overlay" onClick={() => setImagePreview(null)}>
@@ -488,6 +633,26 @@ const AdminDashboard = () => {
           <div className="report-details-modal" onClick={e => e.stopPropagation()}>
             <button className="modal-close" onClick={() => setSelectedReport(null)}>×</button>
             <h3>Report Details</h3>
+            <div className="detail-images detail-images-primary">
+              <label>Submitted Images</label>
+              {selectedReport.images?.length > 0 ? (
+                <div className="image-gallery small detail-images-grid">
+                  {selectedReport.images.map((img, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      className="detail-image-btn"
+                      onClick={() => setImagePreview(selectedReport.images)}
+                      title="Open image gallery"
+                    >
+                      <img src={img} alt={`Submitted image ${index + 1}`} />
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="detail-images-missing">No image was submitted with this report.</p>
+              )}
+            </div>
             <div className="detail-grid">
               <div className="detail-item">
                 <label>Title</label>
@@ -538,16 +703,6 @@ const AdminDashboard = () => {
                 </div>
               )}
             </div>
-            {selectedReport.images?.length > 0 && (
-              <div className="detail-images">
-                <label>Attached Images</label>
-                <div className="image-gallery small">
-                  {selectedReport.images.map((img, index) => (
-                    <img key={index} src={img} alt={`Image ${index + 1}`} />
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}

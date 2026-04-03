@@ -138,6 +138,10 @@ const createReport = async (req, res) => {
   try {
     let { title, description, wasteType, estimatedWeight, location, scheduledDate } = req.body;
 
+    console.log('📥 Create report request received');
+    console.log('   req.body.images:', req.body.images);
+    console.log('   req.files:', req.files?.map(f => ({ filename: f.filename, secure_url: f.secure_url })));
+
     // Handle stringified location if sent from mobile
     if (typeof location === 'string') {
       try {
@@ -160,11 +164,56 @@ const createReport = async (req, res) => {
       }
     };
 
-    // Handle multiple images if uploaded
+    // Handle images from either multipart uploads (req.files) or JSON body (Cloudinary URLs)
     let imageUrls = [];
+
     if (req.files && req.files.length > 0) {
-      imageUrls = req.files.map(file => file.secure_url || file.path || file.url).filter(Boolean);
+      console.log('📸 Found multipart file uploads:', req.files.length);
+      imageUrls = req.files
+        .map(file => file.path || file.secure_url || file.url || file.location)
+        .filter(Boolean);
     }
+
+    // In web flow, images may be sent as URLs in body fields
+    if (imageUrls.length === 0) {
+      const candidates = [req.body.images, req.body.image, req.body.imageUrls, req.body.urls, req.body.files];
+
+      for (const candidate of candidates) {
+        if (!candidate) continue;
+
+        console.log('🔍 Checking candidate field:', typeof candidate, Array.isArray(candidate) ? `array(${candidate.length})` : '');
+
+        if (Array.isArray(candidate)) {
+          imageUrls = candidate
+            .map((item) => (typeof item === 'string' ? item : item?.path || item?.secure_url || item?.url || item?.location || ''))
+            .filter(Boolean);
+        } else if (typeof candidate === 'string') {
+          try {
+            const parsed = JSON.parse(candidate);
+            if (Array.isArray(parsed)) {
+              imageUrls = parsed
+                .map((item) => (typeof item === 'string' ? item : item?.path || item?.secure_url || item?.url || item?.location || ''))
+                .filter(Boolean);
+            } else if (parsed && typeof parsed === 'object') {
+              imageUrls = [parsed.path || parsed.secure_url || parsed.url || parsed.location].filter(Boolean);
+            }
+          } catch (e) {
+            imageUrls = [candidate].filter(Boolean);
+          }
+        } else if (typeof candidate === 'object') {
+          imageUrls = [candidate.secure_url || candidate.url || candidate.path].filter(Boolean);
+        }
+
+        if (imageUrls.length > 0) {
+          console.log('✅ Found images:', imageUrls.length);
+          break;
+        }
+      }
+    }
+
+    imageUrls = [...new Set(imageUrls.filter((u) => /^https?:\/\//i.test(u)))];
+
+    console.log('📦 Final imageUrls stored:', imageUrls);
 
     const report = await GarbageReport.create({
       user: req.user.id,
@@ -176,6 +225,8 @@ const createReport = async (req, res) => {
       images: imageUrls,
       scheduledDate
     });
+
+    console.log('✅ Report created with images:', report.images);
 
     res.status(201).json({
       success: true,

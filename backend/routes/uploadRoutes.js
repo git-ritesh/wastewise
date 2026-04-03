@@ -16,14 +16,28 @@ router.post('/', protect, upload.array('images', 5), handleMulterError, (req, re
       });
     }
 
-    // Generate URLs for uploaded files (Cloudinary secure URLs)
-    const fileUrls = req.files.map(file => ({
-      filename: file.filename,
-      url: file.secure_url,
-      public_id: file.public_id,
-      size: file.size,
-      mimetype: file.mimetype
-    }));
+    console.log('📥 Upload request received');
+    console.log('   Files count:', req.files.length);
+    console.log('   First file object keys:', Object.keys(req.files[0]));
+    console.log('   First file object:', JSON.stringify(req.files[0], null, 2));
+
+    // Generate URLs for uploaded files
+    // multer-storage-cloudinary stores the Cloudinary URL in the 'path' property
+    const fileUrls = req.files.map(file => {
+      // Extract URL from path property (where multer-storage-cloudinary puts it)
+      const url = file.path || file.secure_url || file.url || file.location;
+      console.log(`   ✅ Extracted URL from file: ${file.filename} => ${url}`);
+      
+      return {
+        filename: file.filename,
+        url: url,
+        public_id: file.public_id,
+        size: file.size,
+        mimetype: file.mimetype
+      };
+    });
+
+    console.log('✅ File URLs extracted:', fileUrls.map(f => f.url));
 
     res.status(200).json({
       success: true,

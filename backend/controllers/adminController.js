@@ -2,6 +2,55 @@ const GarbageReport = require('../models/GarbageReport.js');
 const User = require('../models/User.js');
 const { sendNotification } = require('../services/notificationService.js');
 
+const extractImageUrls = (report) => {
+  if (!report) return [];
+
+  const queue = [
+    report.images,
+    report.image,
+    report.imageUrls,
+    report.photos,
+    report.attachments,
+    report.files,
+    report.data?.files,
+    report.data?.urls,
+    report.data?.images
+  ];
+
+  const urls = [];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current) continue;
+
+    if (typeof current === 'string') {
+      urls.push(current);
+      continue;
+    }
+
+    if (Array.isArray(current)) {
+      queue.push(...current);
+      continue;
+    }
+
+    if (typeof current === 'object') {
+      const directUrl = current.secure_url || current.url || current.path || current.src || current.location;
+      if (typeof directUrl === 'string' && directUrl.trim()) {
+        urls.push(directUrl.trim());
+      }
+
+      // Handle nested formats from older payloads
+      if (current.images) queue.push(current.images);
+      if (current.imageUrls) queue.push(current.imageUrls);
+      if (current.files) queue.push(current.files);
+      if (current.urls) queue.push(current.urls);
+      if (current.data) queue.push(current.data);
+    }
+  }
+
+  // Keep only valid URL-like strings and remove duplicates
+  return [...new Set(urls.filter((u) => /^https?:\/\//i.test(u)))];
+};
+
 // @desc    Get all reports (admin view)
 // @route   GET /api/admin/reports
 // @access  Admin only
@@ -39,7 +88,13 @@ const getAllReports = async (req, res) => {
       .populate('assignedCollector', 'name phone')
       .sort(sortConfig)
       .skip((page - 1) * limit)
-      .limit(parseInt(limit));
+      .limit(parseInt(limit))
+      .lean();
+
+    const normalizedReports = reports.map((report) => ({
+      ...report,
+      images: extractImageUrls(report)
+    }));
 
     const total = await GarbageReport.countDocuments(query);
 
@@ -65,7 +120,7 @@ const getAllReports = async (req, res) => {
     res.status(200).json({
       success: true,
       data: {
-        reports,
+        reports: normalizedReports,
         stats: statusStats,
         pagination: {
           page: parseInt(page),
@@ -91,7 +146,8 @@ const getReportDetails = async (req, res) => {
   try {
     const report = await GarbageReport.findById(req.params.id)
       .populate('user', 'name email phone address')
-      .populate('assignedCollector', 'name phone email');
+      .populate('assignedCollector', 'name phone email')
+      .lean();
 
     if (!report) {
       return res.status(404).json({
@@ -99,6 +155,8 @@ const getReportDetails = async (req, res) => {
         message: 'Report not found'
       });
     }
+
+    report.images = extractImageUrls(report);
 
     res.status(200).json({
       success: true,
