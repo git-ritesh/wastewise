@@ -7,10 +7,18 @@ const parseIntEnv = (value, fallback) => {
   return Number.isNaN(parsed) ? fallback : parsed;
 };
 
-const createTransporter = () => {
-  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+const getSMTPConfig = () => {
   const port = parseIntEnv(process.env.SMTP_PORT, 587);
-  const secure = process.env.SMTP_SECURE === 'true' || port === 465;
+
+  return {
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port,
+    secure: process.env.SMTP_SECURE === 'true' || port === 465
+  };
+};
+
+const createTransporter = (smtpConfig = getSMTPConfig()) => {
+  const { host, port, secure } = smtpConfig;
 
   return nodemailer.createTransport({
     host,
@@ -27,6 +35,64 @@ const createTransporter = () => {
       rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED === 'true'
     }
   });
+};
+
+const isTimeoutError = (error) => {
+  if (!error) return false;
+
+  return (
+    error.code === 'ETIMEDOUT' ||
+    /timeout|timed out|connection timeout/i.test(error.message || '')
+  );
+};
+
+const sendWithSMTPFallback = async (mailOptions, purpose) => {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    throw new Error('SMTP credentials are missing. Set SMTP_USER and SMTP_PASS.');
+  }
+
+  const primaryConfig = getSMTPConfig();
+
+  try {
+    const transporter = createTransporter(primaryConfig);
+    const info = await transporter.sendMail(mailOptions);
+    return { info, usedConfig: primaryConfig };
+  } catch (primaryError) {
+    console.error(
+      `❌ ${purpose} failed via ${primaryConfig.host}:${primaryConfig.port} secure=${primaryConfig.secure} | ${primaryError.message}`
+    );
+
+    const fallbackEnabled = process.env.SMTP_DISABLE_FALLBACK_465 !== 'true';
+    const shouldTryFallback =
+      fallbackEnabled &&
+      isTimeoutError(primaryError) &&
+      primaryConfig.port === 587 &&
+      process.env.SMTP_SECURE !== 'true';
+
+    if (!shouldTryFallback) {
+      throw primaryError;
+    }
+
+    const fallbackConfig = {
+      ...primaryConfig,
+      port: 465,
+      secure: true
+    };
+
+    try {
+      const fallbackTransporter = createTransporter(fallbackConfig);
+      const info = await fallbackTransporter.sendMail(mailOptions);
+      console.log(
+        `✅ ${purpose} recovered via fallback ${fallbackConfig.host}:${fallbackConfig.port} secure=${fallbackConfig.secure}`
+      );
+      return { info, usedConfig: fallbackConfig };
+    } catch (fallbackError) {
+      console.error(
+        `❌ ${purpose} fallback failed via ${fallbackConfig.host}:${fallbackConfig.port} secure=${fallbackConfig.secure} | ${fallbackError.message}`
+      );
+      throw fallbackError;
+    }
+  }
 };
 
 const sendOTPEmail = async (email, otp, type = 'verification') => {
@@ -79,13 +145,9 @@ const sendOTPEmail = async (email, otp, type = 'verification') => {
   };
 
   try {
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      throw new Error('SMTP credentials are missing. Set SMTP_USER and SMTP_PASS.');
-    }
-
-    const transporter = createTransporter();
-    const info = await transporter.sendMail(mailOptions);
+    const { info, usedConfig } = await sendWithSMTPFallback(mailOptions, 'OTP email');
     console.log(`✅ OTP email sent to ${email} | MessageId: ${info.messageId}`);
+    console.log(`📬 SMTP route used: ${usedConfig.host}:${usedConfig.port} secure=${usedConfig.secure}`);
     return true;
   } catch (error) {
     console.error('❌ Email send error:', error.message);
@@ -110,13 +172,9 @@ const sendEmail = async ({ email, subject, message }) => {
   };
 
   try {
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      throw new Error('SMTP credentials are missing. Set SMTP_USER and SMTP_PASS.');
-    }
-
-    const transporter = createTransporter();
-    await transporter.sendMail(mailOptions);
+    const { usedConfig } = await sendWithSMTPFallback(mailOptions, 'Email');
     console.log(`✅ Email sent to ${email}`);
+    console.log(`📬 SMTP route used: ${usedConfig.host}:${usedConfig.port} secure=${usedConfig.secure}`);
     return true;
   } catch (error) {
     console.error('❌ Email send error:', error.message);
@@ -187,13 +245,9 @@ const sendCollectorCredentialsEmail = async (email, name, password) => {
   };
 
   try {
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      throw new Error('SMTP credentials are missing. Set SMTP_USER and SMTP_PASS.');
-    }
-
-    const transporter = createTransporter();
-    const info = await transporter.sendMail(mailOptions);
+    const { info, usedConfig } = await sendWithSMTPFallback(mailOptions, 'Collector credentials email');
     console.log(`✅ Collector credentials email sent to ${email} | MessageId: ${info.messageId}`);
+    console.log(`📬 SMTP route used: ${usedConfig.host}:${usedConfig.port} secure=${usedConfig.secure}`);
     return true;
   } catch (error) {
     console.error('❌ Collector credentials email error:', error.message);
