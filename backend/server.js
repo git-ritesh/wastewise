@@ -68,6 +68,15 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Render and other platforms often probe GET / for health status.
+app.get('/', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'WasteWise backend is running',
+    health: '/api/health'
+  });
+});
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({
