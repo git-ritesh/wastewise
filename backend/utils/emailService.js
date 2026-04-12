@@ -1,117 +1,76 @@
-const nodemailer = require('nodemailer');
-
 const isProduction = process.env.NODE_ENV === 'production';
 
-const parseIntEnv = (value, fallback) => {
-  const parsed = parseInt(value, 10);
-  return Number.isNaN(parsed) ? fallback : parsed;
-};
-
 const getFromAddress = () => {
-  const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER;
-  const fromName = process.env.SMTP_FROM_NAME || 'WasteWise';
-  return `"${fromName}" <${fromEmail}>`;
-};
-
-const getSMTPConfig = () => {
-  const port = parseIntEnv(process.env.SMTP_PORT, 587);
-
+  const fromEmail = process.env.BREVO_SENDER_EMAIL || process.env.SMTP_FROM || process.env.SMTP_USER;
+  const fromName = process.env.BREVO_SENDER_NAME || process.env.SMTP_FROM_NAME || 'WasteWise';
   return {
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port,
-    secure: process.env.SMTP_SECURE === 'true' || port === 465
+    name: fromName,
+    email: fromEmail
   };
 };
 
-const createTransporter = (smtpConfig = getSMTPConfig()) => {
-  const { host, port, secure } = smtpConfig;
+const buildBrevoPayload = ({ email, subject, htmlContent, textContent }) => ({
+  sender: getFromAddress(),
+  to: [{ email }],
+  subject,
+  htmlContent,
+  ...(textContent ? { textContent } : {})
+});
 
-  return nodemailer.createTransport({
-    host,
-    port,
-    secure,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS
-    },
-    connectionTimeout: parseIntEnv(process.env.SMTP_CONNECTION_TIMEOUT, 10000),
-    greetingTimeout: parseIntEnv(process.env.SMTP_GREETING_TIMEOUT, 10000),
-    socketTimeout: parseIntEnv(process.env.SMTP_SOCKET_TIMEOUT, 15000),
-    tls: {
-      rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED === 'true'
-    }
-  });
-};
-
-const isTimeoutError = (error) => {
-  if (!error) return false;
-
-  return (
-    error.code === 'ETIMEDOUT' ||
-    /timeout|timed out|connection timeout/i.test(error.message || '')
-  );
-};
-
-const formatSMTPError = (error) => {
-  if (!error) return 'Unknown SMTP error';
-
-  const parts = [error.message || 'SMTP error'];
-
-  if (error.code) parts.push(`code=${error.code}`);
-  if (error.errno) parts.push(`errno=${error.errno}`);
-  if (error.command) parts.push(`command=${error.command}`);
-  if (error.responseCode) parts.push(`responseCode=${error.responseCode}`);
-  if (error.syscall) parts.push(`syscall=${error.syscall}`);
-
-  return parts.join(' | ');
-};
-
-const sendWithSMTPFallback = async (mailOptions, purpose) => {
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-    throw new Error('SMTP credentials are missing. Set SMTP_USER and SMTP_PASS.');
+const sendViaBrevoApi = async ({ email, subject, htmlContent, textContent, purpose }) => {
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey) {
+    throw new Error('BREVO_API_KEY is missing. Set BREVO_API_KEY in your environment.');
   }
 
-  const primaryConfig = getSMTPConfig();
+  const payload = buildBrevoPayload({ email, subject, htmlContent, textContent });
+  const timeoutMs = parseInt(process.env.BREVO_API_TIMEOUT_MS || '15000', 10) || 15000;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const transporter = createTransporter(primaryConfig);
-    const info = await transporter.sendMail(mailOptions);
-    return { info, usedConfig: primaryConfig };
-  } catch (primaryError) {
-      console.error(
-        `❌ ${purpose} failed via ${primaryConfig.host}:${primaryConfig.port} secure=${primaryConfig.secure} | ${formatSMTPError(primaryError)}`
-      );
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'api-key': apiKey,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
 
-    const fallbackEnabled = process.env.SMTP_DISABLE_FALLBACK_465 !== 'true';
-    const shouldTryFallback =
-      fallbackEnabled &&
-      isTimeoutError(primaryError) &&
-      primaryConfig.port === 587 &&
-      process.env.SMTP_SECURE !== 'true';
+    const responseText = await response.text();
+    let responseBody = null;
 
-    if (!shouldTryFallback) {
-      throw primaryError;
+    if (responseText) {
+      try {
+        responseBody = JSON.parse(responseText);
+      } catch (parseError) {
+        responseBody = responseText;
+      }
     }
 
-    const fallbackConfig = {
-      ...primaryConfig,
-      port: 465,
-      secure: true
+    if (!response.ok) {
+      const details = typeof responseBody === 'string'
+        ? responseBody
+        : JSON.stringify(responseBody || {});
+      throw new Error(`Brevo API request failed (${response.status}): ${details}`);
+    }
+
+    return {
+      info: responseBody || {},
+      usedTransport: 'brevo-api'
     };
-
-    try {
-      const fallbackTransporter = createTransporter(fallbackConfig);
-      const info = await fallbackTransporter.sendMail(mailOptions);
-      console.log(
-        `✅ ${purpose} recovered via fallback ${fallbackConfig.host}:${fallbackConfig.port} secure=${fallbackConfig.secure}`
-      );
-      return { info, usedConfig: fallbackConfig };
-    } catch (fallbackError) {
-        console.error(
-          `❌ ${purpose} fallback failed via ${fallbackConfig.host}:${fallbackConfig.port} secure=${fallbackConfig.secure} | ${formatSMTPError(fallbackError)}`
-        );
-      throw fallbackError;
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error(`Brevo API request timed out after ${timeoutMs}ms`);
     }
+
+    console.error(`❌ ${purpose} failed via Brevo API | ${error.message}`);
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
 };
 
@@ -121,7 +80,6 @@ const sendOTPEmail = async (email, otp, type = 'verification') => {
     : 'WasteWise - Reset Your Password';
 
   const mailOptions = {
-    from: getFromAddress(),
     to: email,
     subject: subject,
     html: `
@@ -165,9 +123,17 @@ const sendOTPEmail = async (email, otp, type = 'verification') => {
   };
 
   try {
-    const { info, usedConfig } = await sendWithSMTPFallback(mailOptions, 'OTP email');
-    console.log(`✅ OTP email sent to ${email} | MessageId: ${info.messageId}`);
-    console.log(`📬 SMTP route used: ${usedConfig.host}:${usedConfig.port} secure=${usedConfig.secure}`);
+    const { info, usedTransport } = await sendViaBrevoApi({
+      email,
+      subject,
+      htmlContent: mailOptions.html,
+      purpose: 'OTP email'
+    });
+    console.log(`✅ OTP email sent to ${email}`);
+    console.log(`📬 Transport used: ${usedTransport}`);
+    if (info && info.messageId) {
+      console.log(`🆔 Brevo MessageId: ${info.messageId}`);
+    }
     return true;
   } catch (error) {
     console.error('❌ Email send error:', error.message);
@@ -185,16 +151,19 @@ const sendOTPEmail = async (email, otp, type = 'verification') => {
 
 const sendEmail = async ({ email, subject, message }) => {
   const mailOptions = {
-    from: getFromAddress(),
-    to: email,
     subject: subject,
     html: message
   };
 
   try {
-    const { usedConfig } = await sendWithSMTPFallback(mailOptions, 'Email');
+    const { usedTransport } = await sendViaBrevoApi({
+      email,
+      subject,
+      htmlContent: message,
+      purpose: 'Email'
+    });
     console.log(`✅ Email sent to ${email}`);
-    console.log(`📬 SMTP route used: ${usedConfig.host}:${usedConfig.port} secure=${usedConfig.secure}`);
+    console.log(`📬 Transport used: ${usedTransport}`);
     return true;
   } catch (error) {
     console.error('❌ Email send error:', error.message);
@@ -209,8 +178,6 @@ const sendEmail = async ({ email, subject, message }) => {
 
 const sendCollectorCredentialsEmail = async (email, name, password) => {
   const mailOptions = {
-    from: getFromAddress(),
-    to: email,
     subject: 'WasteWise - Your Collector Account Credentials',
     html: `
       <!DOCTYPE html>
@@ -265,9 +232,17 @@ const sendCollectorCredentialsEmail = async (email, name, password) => {
   };
 
   try {
-    const { info, usedConfig } = await sendWithSMTPFallback(mailOptions, 'Collector credentials email');
-    console.log(`✅ Collector credentials email sent to ${email} | MessageId: ${info.messageId}`);
-    console.log(`📬 SMTP route used: ${usedConfig.host}:${usedConfig.port} secure=${usedConfig.secure}`);
+    const { info, usedTransport } = await sendViaBrevoApi({
+      email,
+      subject: mailOptions.subject,
+      htmlContent: mailOptions.html,
+      purpose: 'Collector credentials email'
+    });
+    console.log(`✅ Collector credentials email sent to ${email}`);
+    console.log(`📬 Transport used: ${usedTransport}`);
+    if (info && info.messageId) {
+      console.log(`🆔 Brevo MessageId: ${info.messageId}`);
+    }
     return true;
   } catch (error) {
     console.error('❌ Collector credentials email error:', error.message);

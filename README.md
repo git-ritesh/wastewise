@@ -38,6 +38,7 @@ The backend serves both the mobile app and the web dashboard.
     JWT_SECRET=your_secret_key
     CLIENT_URL=http://localhost:5173
     ```
+    For the full set of required variables, copy [backend/.env.example](backend/.env.example) and fill in your real values.
 4.  **Run Dev Server**:
     ```bash
     npm run dev
@@ -46,6 +47,21 @@ The backend serves both the mobile app and the web dashboard.
     ```bash
     node seed_test_data.js
     ```
+
+---
+
+## 🔐 Env Setup
+Use the same backend keys in both places:
+- **Local development**: create `backend/.env` from [backend/.env.example](backend/.env.example)
+- **Render production**: set the same variables in the Render service environment
+
+Required values include MongoDB, JWT, CORS URLs, Cloudinary, and Brevo API:
+- `BREVO_API_KEY=<your Brevo API key>`
+- `BREVO_SENDER_EMAIL=<your verified Brevo sender email>`
+- `BREVO_SENDER_NAME=WasteWise`
+- `BREVO_API_TIMEOUT_MS=15000`
+
+Do not commit your real `.env` file to git.
 
 ---
 
