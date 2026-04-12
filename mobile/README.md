@@ -20,10 +20,21 @@ A React Native application for smart waste management, built with Expo and Redux
 ---
 
 ## ⚙️ Step 2: Configuration
-Open `src/utils/constants.js` and update the `BASE_URL` with your computer's IP:
-```javascript
-export const BASE_URL = 'http://192.168.1.101:5000/api'; // Replace with your IP
+Create a local env file from the template:
+
+```bash
+cp .env.example .env
 ```
+
+Set your API URL in `.env`:
+
+```env
+EXPO_PUBLIC_API_BASE_URL=http://192.168.1.101:5000/api
+```
+
+You can also use:
+- Android emulator: `http://10.0.2.2:5000/api`
+- Production backend: `https://your-backend-domain/api`
 
 ---
 
@@ -74,5 +85,5 @@ Since build tools like Android Studio are not required locally, we use **EAS Bui
 
 ## 🧪 Troubleshooting
 - **Network Error**: Ensure your computer's firewall is not blocking port `5000`.
-- **IP Change**: If you restart your router, your IP might change. Update `constants.js` and rebuild.
+- **IP Change**: If your local IP changes, update `EXPO_PUBLIC_API_BASE_URL` in `.env` and restart Expo.
 - **Backend**: Ensure the backend server is running (`npm run dev` in the `backend` folder).

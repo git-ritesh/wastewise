@@ -25,12 +25,10 @@ const OTPVerifyScreen = ({ navigation, route }) => {
   const [canResend, setCanResend] = useState(false);
   const inputRefs = useRef([]);
 
-  // Countdown timer
+  // Countdown timer that can be restarted after resend.
   useEffect(() => {
-    if (timer <= 0) {
-      setCanResend(true);
-      return;
-    }
+    if (canResend) return;
+
     const interval = setInterval(() => {
       setTimer((t) => {
         if (t <= 1) {
@@ -41,8 +39,9 @@ const OTPVerifyScreen = ({ navigation, route }) => {
         return t - 1;
       });
     }, 1000);
+
     return () => clearInterval(interval);
-  }, []);
+  }, [canResend]);
 
   const handleOtpChange = (value, index) => {
     // Only allow digits

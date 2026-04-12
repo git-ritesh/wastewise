@@ -1,7 +1,8 @@
 // ⚠️ IMPORTANT: Replace 192.168.x.x with your computer's local IP address
 // export const BASE_URL = 'http://192.168.1.107:5000/api'; 
 // export const BASE_URL = 'http://10.0.2.2:5000/api'; // Emulator only
-export const BASE_URL = 'https://waste-wise-vey0.onrender.com/api'
+const envBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+export const BASE_URL = envBaseUrl || 'https://waste-wise-vey0.onrender.com/api';
 
 export const COLORS = {
   primary: '#10B981', // Emerald 500
