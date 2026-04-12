@@ -7,6 +7,12 @@ const parseIntEnv = (value, fallback) => {
   return Number.isNaN(parsed) ? fallback : parsed;
 };
 
+const getFromAddress = () => {
+  const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER;
+  const fromName = process.env.SMTP_FROM_NAME || 'WasteWise';
+  return `"${fromName}" <${fromEmail}>`;
+};
+
 const getSMTPConfig = () => {
   const port = parseIntEnv(process.env.SMTP_PORT, 587);
 
@@ -46,6 +52,20 @@ const isTimeoutError = (error) => {
   );
 };
 
+const formatSMTPError = (error) => {
+  if (!error) return 'Unknown SMTP error';
+
+  const parts = [error.message || 'SMTP error'];
+
+  if (error.code) parts.push(`code=${error.code}`);
+  if (error.errno) parts.push(`errno=${error.errno}`);
+  if (error.command) parts.push(`command=${error.command}`);
+  if (error.responseCode) parts.push(`responseCode=${error.responseCode}`);
+  if (error.syscall) parts.push(`syscall=${error.syscall}`);
+
+  return parts.join(' | ');
+};
+
 const sendWithSMTPFallback = async (mailOptions, purpose) => {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
     throw new Error('SMTP credentials are missing. Set SMTP_USER and SMTP_PASS.');
@@ -58,9 +78,9 @@ const sendWithSMTPFallback = async (mailOptions, purpose) => {
     const info = await transporter.sendMail(mailOptions);
     return { info, usedConfig: primaryConfig };
   } catch (primaryError) {
-    console.error(
-      `❌ ${purpose} failed via ${primaryConfig.host}:${primaryConfig.port} secure=${primaryConfig.secure} | ${primaryError.message}`
-    );
+      console.error(
+        `❌ ${purpose} failed via ${primaryConfig.host}:${primaryConfig.port} secure=${primaryConfig.secure} | ${formatSMTPError(primaryError)}`
+      );
 
     const fallbackEnabled = process.env.SMTP_DISABLE_FALLBACK_465 !== 'true';
     const shouldTryFallback =
@@ -87,9 +107,9 @@ const sendWithSMTPFallback = async (mailOptions, purpose) => {
       );
       return { info, usedConfig: fallbackConfig };
     } catch (fallbackError) {
-      console.error(
-        `❌ ${purpose} fallback failed via ${fallbackConfig.host}:${fallbackConfig.port} secure=${fallbackConfig.secure} | ${fallbackError.message}`
-      );
+        console.error(
+          `❌ ${purpose} fallback failed via ${fallbackConfig.host}:${fallbackConfig.port} secure=${fallbackConfig.secure} | ${formatSMTPError(fallbackError)}`
+        );
       throw fallbackError;
     }
   }
@@ -101,7 +121,7 @@ const sendOTPEmail = async (email, otp, type = 'verification') => {
     : 'WasteWise - Reset Your Password';
 
   const mailOptions = {
-    from: `"WasteWise 🌿" <${process.env.SMTP_USER}>`,
+    from: getFromAddress(),
     to: email,
     subject: subject,
     html: `
@@ -165,7 +185,7 @@ const sendOTPEmail = async (email, otp, type = 'verification') => {
 
 const sendEmail = async ({ email, subject, message }) => {
   const mailOptions = {
-    from: `"WasteWise 🌿" <${process.env.SMTP_USER}>`,
+    from: getFromAddress(),
     to: email,
     subject: subject,
     html: message
@@ -189,7 +209,7 @@ const sendEmail = async ({ email, subject, message }) => {
 
 const sendCollectorCredentialsEmail = async (email, name, password) => {
   const mailOptions = {
-    from: `"WasteWise 🌿" <${process.env.SMTP_USER}>`,
+    from: getFromAddress(),
     to: email,
     subject: 'WasteWise - Your Collector Account Credentials',
     html: `
