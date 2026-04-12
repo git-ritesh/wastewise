@@ -20,6 +20,8 @@ const purgeExpiredUnverifiedUsers = async () => {
 // @route   POST /api/auth/register
 // @access  Public
 const register = async (req, res) => {
+  let createdUserId = null;
+
   try {
     const { name, email, password, phone } = req.body;
 
@@ -43,13 +45,22 @@ const register = async (req, res) => {
       phone,
       role: 'user'
     });
+    createdUserId = user._id;
 
     // Generate OTP
     const otp = user.generateOTP();
     await user.save();
 
     // Send OTP email
-    await sendOTPEmail(email, otp, 'verification');
+    const emailSent = await sendOTPEmail(email, otp, 'verification');
+
+    if (process.env.NODE_ENV === 'production' && !emailSent) {
+      await User.findByIdAndDelete(createdUserId);
+      return res.status(503).json({
+        success: false,
+        message: 'Unable to send OTP email right now. Please try again in a few minutes.'
+      });
+    }
 
     res.status(201).json({
       success: true,
@@ -61,7 +72,13 @@ const register = async (req, res) => {
     });
   } catch (error) {
     console.error('Register error:', error);
-    res.status(500).json({
+
+    if (createdUserId) {
+      await User.findByIdAndDelete(createdUserId);
+    }
+
+    const statusCode = /otp email|deliver otp|send otp/i.test(error.message) ? 503 : 500;
+    res.status(statusCode).json({
       success: false,
       message: error.message || 'Server error during registration'
     });

@@ -1,16 +1,30 @@
 const nodemailer = require('nodemailer');
 
+const isProduction = process.env.NODE_ENV === 'production';
+
+const parseIntEnv = (value, fallback) => {
+  const parsed = parseInt(value, 10);
+  return Number.isNaN(parsed) ? fallback : parsed;
+};
+
 const createTransporter = () => {
+  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+  const port = parseIntEnv(process.env.SMTP_PORT, 587);
+  const secure = process.env.SMTP_SECURE === 'true' || port === 465;
+
   return nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
+    host,
+    port,
+    secure,
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS
     },
+    connectionTimeout: parseIntEnv(process.env.SMTP_CONNECTION_TIMEOUT, 10000),
+    greetingTimeout: parseIntEnv(process.env.SMTP_GREETING_TIMEOUT, 10000),
+    socketTimeout: parseIntEnv(process.env.SMTP_SOCKET_TIMEOUT, 15000),
     tls: {
-      rejectUnauthorized: false
+      rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED === 'true'
     }
   });
 };
@@ -65,17 +79,25 @@ const sendOTPEmail = async (email, otp, type = 'verification') => {
   };
 
   try {
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      throw new Error('SMTP credentials are missing. Set SMTP_USER and SMTP_PASS.');
+    }
+
     const transporter = createTransporter();
     const info = await transporter.sendMail(mailOptions);
     console.log(`✅ OTP email sent to ${email} | MessageId: ${info.messageId}`);
     return true;
   } catch (error) {
     console.error('❌ Email send error:', error.message);
-    // Always log OTP to console as fallback for prototype testing
-    console.log(`\n========================================`);
-    console.log(`📧 [DEV FALLBACK] OTP for ${email}: ${otp}`);
-    console.log(`========================================\n`);
-    return false;
+
+    if (!isProduction) {
+      console.log(`\n========================================`);
+      console.log(`📧 [DEV FALLBACK] OTP for ${email}: ${otp}`);
+      console.log(`========================================\n`);
+      return false;
+    }
+
+    throw new Error('Unable to deliver OTP email at the moment. Please try again shortly.');
   }
 };
 
@@ -88,12 +110,21 @@ const sendEmail = async ({ email, subject, message }) => {
   };
 
   try {
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      throw new Error('SMTP credentials are missing. Set SMTP_USER and SMTP_PASS.');
+    }
+
     const transporter = createTransporter();
     await transporter.sendMail(mailOptions);
     console.log(`✅ Email sent to ${email}`);
     return true;
   } catch (error) {
     console.error('❌ Email send error:', error.message);
+
+    if (isProduction) {
+      throw new Error('Unable to send email right now. Please try again later.');
+    }
+
     return false;
   }
 };
@@ -156,18 +187,26 @@ const sendCollectorCredentialsEmail = async (email, name, password) => {
   };
 
   try {
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      throw new Error('SMTP credentials are missing. Set SMTP_USER and SMTP_PASS.');
+    }
+
     const transporter = createTransporter();
     const info = await transporter.sendMail(mailOptions);
     console.log(`✅ Collector credentials email sent to ${email} | MessageId: ${info.messageId}`);
     return true;
   } catch (error) {
     console.error('❌ Collector credentials email error:', error.message);
-    // Fallback: log credentials to console for dev/testing
-    console.log(`\n========================================`);
-    console.log(`📧 [DEV FALLBACK] Collector credentials for ${email}:`);
-    console.log(`   Password: ${password}`);
-    console.log(`========================================\n`);
-    return false;
+
+    if (!isProduction) {
+      console.log(`\n========================================`);
+      console.log(`📧 [DEV FALLBACK] Collector credentials for ${email}:`);
+      console.log(`   Password: ${password}`);
+      console.log(`========================================\n`);
+      return false;
+    }
+
+    throw new Error('Unable to send collector credentials email at the moment.');
   }
 };
 
