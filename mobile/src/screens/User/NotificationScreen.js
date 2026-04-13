@@ -4,14 +4,22 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, ArrowLeft, MoreVertical } from 'lucide-react-native';
 import client from '../../api/client';
 import { COLORS } from '../../utils/constants';
+import { useRealtime } from '../../context/RealtimeContext';
 
 const NotificationScreen = ({ navigation }) => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
+  const { revision } = useRealtime();
 
   useEffect(() => {
     fetchNotifications();
   }, []);
+
+  useEffect(() => {
+    if (revision > 0) {
+      fetchNotifications();
+    }
+  }, [revision]);
 
   const fetchNotifications = async () => {
     try {

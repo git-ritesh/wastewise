@@ -4,26 +4,35 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Award, TrendingUp, TrendingDown } from 'lucide-react-native';
 import client from '../../api/client';
 import { COLORS } from '../../utils/constants';
+import { useRealtime } from '../../context/RealtimeContext';
 
 const RewardScreen = ({ navigation }) => {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { revision } = useRealtime();
+
+  const fetchHistory = async () => {
+    try {
+      const res = await client.get('/rewards/history');
+      if (res.data.success) {
+        setHistory(res.data.data.history);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchHistory = async () => {
-      try {
-        const res = await client.get('/rewards/history');
-        if (res.data.success) {
-          setHistory(res.data.data.history);
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchHistory();
   }, []);
+
+  useEffect(() => {
+    if (revision > 0) {
+      fetchHistory();
+    }
+  }, [revision]);
 
   const renderItem = ({ item }) => (
     <View style={styles.card}>

@@ -1,6 +1,6 @@
 const RewardTransaction = require('../models/RewardTransaction.js');
 const User = require('../models/User.js');
-const { sendNotification } = require('../services/notificationService.js');
+const { sendNotification, emitSocketEvent } = require('../services/notificationService.js');
 
 // @desc    Get user's reward history and balance
 // @route   GET /api/rewards/history
@@ -82,6 +82,14 @@ const redeemPoints = async (req, res) => {
       success: true,
       message: 'Redemption request submitted',
       data: transaction
+    });
+
+    emitSocketEvent('data:update', {
+      scope: 'all',
+      entity: 'reward',
+      action: 'redeem-requested',
+      userId: req.user.id,
+      transactionId: transaction._id.toString()
     });
   } catch (error) {
     console.error('Redeem points error:', error);
@@ -216,6 +224,15 @@ const processRedemption = async (req, res) => {
       success: true,
       message: `Redemption request ${status}`,
       data: transaction
+    });
+
+    emitSocketEvent('data:update', {
+      scope: 'all',
+      entity: 'reward',
+      action: 'redemption-processed',
+      status,
+      userId: transaction.user.toString(),
+      transactionId: transaction._id.toString()
     });
   } catch (error) {
     console.error('Process redemption error:', error);

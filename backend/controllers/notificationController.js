@@ -1,4 +1,5 @@
 const Notification = require('../models/Notification.js');
+const { emitSocketEvent } = require('../services/notificationService.js');
 
 // @desc    Get user notifications
 // @route   GET /api/notifications
@@ -52,6 +53,14 @@ const markAsRead = async (req, res) => {
       success: true,
       data: notification
     });
+
+    emitSocketEvent('data:update', {
+      scope: 'all',
+      entity: 'notification',
+      action: 'read',
+      userId: req.user.id,
+      notificationId: notification._id.toString()
+    });
   } catch (error) {
     console.error('Mark read error:', error);
     res.status(500).json({
@@ -75,6 +84,13 @@ const markAllAsRead = async (req, res) => {
       success: true,
       message: 'All notifications marked as read'
     });
+
+    emitSocketEvent('data:update', {
+      scope: 'all',
+      entity: 'notification',
+      action: 'read-all',
+      userId: req.user.id
+    });
   } catch (error) {
     console.error('Mark all read error:', error);
     res.status(500).json({
@@ -97,6 +113,13 @@ const clearAllNotifications = async (req, res) => {
       data: {
         deletedCount: result.deletedCount
       }
+    });
+
+    emitSocketEvent('data:update', {
+      scope: 'all',
+      entity: 'notification',
+      action: 'cleared',
+      userId: req.user.id
     });
   } catch (error) {
     console.error('Clear notifications error:', error);

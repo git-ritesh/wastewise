@@ -46,6 +46,11 @@ export const RealtimeProvider = ({ children }) => {
       setRevision((value) => value + 1);
     });
 
+    newSocket.on('notification', (payload) => {
+      setLastEvent(payload);
+      setRevision((value) => value + 1);
+    });
+
     newSocket.on('connect_error', (error) => {
       console.log('Realtime socket error:', error.message);
     });

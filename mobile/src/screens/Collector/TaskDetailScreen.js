@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   View, 
   Text, 
@@ -16,14 +16,37 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Camera, MapPin, CheckCircle2 } from 'lucide-react-native';
 import client from '../../api/client';
 import { COLORS } from '../../utils/constants';
+import { useRealtime } from '../../context/RealtimeContext';
 
 const { width } = Dimensions.get('window');
 
 const TaskDetailScreen = ({ route, navigation }) => {
   const { task } = route.params;
+  const [taskState, setTaskState] = useState(task);
   const [image, setImage] = useState(null);
   const [note, setNote] = useState('');
   const [uploading, setUploading] = useState(false);
+  const { revision } = useRealtime();
+
+  const refreshTaskState = async () => {
+    try {
+      const res = await client.get('/collector/tasks');
+      if (res.data.success) {
+        const latestTask = (res.data?.data?.tasks || []).find((item) => item._id === task._id);
+        if (latestTask) {
+          setTaskState(latestTask);
+        }
+      }
+    } catch (error) {
+      console.error('Refresh task state error:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (revision > 0) {
+      refreshTaskState();
+    }
+  }, [revision]);
 
   const pickImage = async () => {
     let result = await ImagePicker.launchCameraAsync({
@@ -53,10 +76,11 @@ const TaskDetailScreen = ({ route, navigation }) => {
     formData.append('note', note);
 
     try {
-      const res = await client.post(`/collector/tasks/${task._id}/complete`, formData, {
+      const res = await client.post(`/collector/tasks/${taskState._id}/complete`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       if (res.data.success) {
+        setTaskState(res.data.data);
         Alert.alert('Success', 'Task marked as completed!', [
           { text: 'OK', onPress: () => navigation.goBack() }
         ]);
@@ -80,17 +104,17 @@ const TaskDetailScreen = ({ route, navigation }) => {
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.statusSection}>
-          <View style={[styles.statusBadge, { backgroundColor: task.status === 'completed' ? '#ECFDF5' : '#FEF3C7' }]}>
-            <View style={[styles.statusDot, { backgroundColor: task.status === 'completed' ? '#10B981' : '#F59E0B' }]} />
-            <Text style={[styles.statusText, { color: task.status === 'completed' ? '#10B981' : '#B45309' }]}>
-              {task.status.toUpperCase()}
+          <View style={[styles.statusBadge, { backgroundColor: taskState.status === 'completed' ? '#ECFDF5' : '#FEF3C7' }]}>
+            <View style={[styles.statusDot, { backgroundColor: taskState.status === 'completed' ? '#10B981' : '#F59E0B' }]} />
+            <Text style={[styles.statusText, { color: taskState.status === 'completed' ? '#10B981' : '#B45309' }]}>
+              {taskState.status.toUpperCase()}
             </Text>
           </View>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.taskTitle}>{task.title}</Text>
-          <Text style={styles.taskDesc}>{task.description}</Text>
+          <Text style={styles.taskTitle}>{taskState.title}</Text>
+          <Text style={styles.taskDesc}>{taskState.description}</Text>
           
           <View style={styles.divider} />
           
@@ -100,12 +124,12 @@ const TaskDetailScreen = ({ route, navigation }) => {
             </View>
             <View style={styles.infoTextContainer}>
               <Text style={styles.infoLabel}>Location</Text>
-              <Text style={styles.infoValue}>{task.location?.address || 'Near Downtown'}</Text>
+              <Text style={styles.infoValue}>{taskState.location?.address || 'Near Downtown'}</Text>
             </View>
           </View>
         </View>
 
-        {task.status !== 'completed' && (
+        {taskState.status !== 'completed' && (
           <View style={styles.completionSection}>
             <Text style={styles.sectionTitle}>Submit Proof</Text>
             
