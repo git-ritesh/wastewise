@@ -136,14 +136,6 @@ const getAllReports = async (req, res) => {
       success: false,
       message: 'Error fetching reports'
     });
-
-    emitSocketEvent('data:update', {
-      scope: 'all',
-      entity: 'report',
-      action: 'status-updated',
-      reportId: updatedReport._id.toString(),
-      status: updatedReport.status
-    });
   }
 };
 
@@ -323,6 +315,16 @@ const updateReportStatus = async (req, res) => {
     const updatedReport = await GarbageReport.findById(report._id)
       .populate('user', 'name email phone')
       .populate('assignedCollector', 'name phone');
+
+    // Trigger dashboards to refresh immediately after assignment/status changes.
+    emitSocketEvent('data:update', {
+      scope: 'all',
+      entity: 'report',
+      action: 'status-updated',
+      reportId: updatedReport._id.toString(),
+      status: updatedReport.status,
+      collectorId: updatedReport.assignedCollector?._id?.toString() || null
+    });
 
     res.status(200).json({
       success: true,

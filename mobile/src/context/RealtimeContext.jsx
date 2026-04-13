@@ -20,9 +20,10 @@ export const RealtimeProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
   const [revision, setRevision] = useState(0);
   const [lastEvent, setLastEvent] = useState(null);
+  const userId = user?._id || user?.id;
 
   useEffect(() => {
-    if (!token || !user?._id) {
+    if (!token || !userId) {
       if (socket) {
         socket.close();
         setSocket(null);
@@ -37,7 +38,7 @@ export const RealtimeProvider = ({ children }) => {
     });
 
     newSocket.on('connect', () => {
-      newSocket.emit('join', user._id);
+      newSocket.emit('join', userId);
     });
 
     newSocket.on('data:update', (payload) => {
@@ -55,7 +56,7 @@ export const RealtimeProvider = ({ children }) => {
       newSocket.close();
       setSocket(null);
     };
-  }, [token, user?._id]);
+  }, [token, userId]);
 
   const value = useMemo(
     () => ({ socket, revision, lastEvent }),
