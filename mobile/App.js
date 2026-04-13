@@ -11,6 +11,7 @@ import { store } from './src/redux/store';
 import { loadUser } from './src/redux/authSlice';
 import AppNavigator from './src/navigation/AppNavigator';
 import { RealtimeProvider } from './src/context/RealtimeContext';
+import { initNotificationSupport } from './src/utils/notifications';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -27,6 +28,12 @@ const Root = () => {
   useEffect(() => {
     dispatch(loadUser());
   }, [dispatch]);
+
+  useEffect(() => {
+    initNotificationSupport().catch((error) => {
+      console.log('Notification init error:', error?.message || error);
+    });
+  }, []);
 
   useEffect(() => {
     if (fontsLoaded) {

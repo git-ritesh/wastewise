@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { useSelector } from 'react-redux';
 
 import { BASE_URL } from '../utils/constants';
+import { showLocalNotification } from '../utils/notifications';
 
 const RealtimeContext = createContext({
   socket: null,
@@ -20,6 +21,7 @@ export const RealtimeProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
   const [revision, setRevision] = useState(0);
   const [lastEvent, setLastEvent] = useState(null);
+  const lastNotificationId = useRef(null);
   const userId = user?._id || user?.id;
 
   useEffect(() => {
@@ -49,6 +51,26 @@ export const RealtimeProvider = ({ children }) => {
     newSocket.on('notification', (payload) => {
       setLastEvent(payload);
       setRevision((value) => value + 1);
+
+      const notificationId = payload?._id || payload?.id || null;
+      if (notificationId && notificationId === lastNotificationId.current) {
+        return;
+      }
+      if (notificationId) {
+        lastNotificationId.current = notificationId;
+      }
+
+      showLocalNotification({
+        title: payload?.title,
+        message: payload?.message,
+        data: {
+          notificationId,
+          type: payload?.type,
+          relatedId: payload?.relatedId
+        }
+      }).catch((error) => {
+        console.log('Local notification error:', error?.message || error);
+      });
     });
 
     newSocket.on('connect_error', (error) => {
