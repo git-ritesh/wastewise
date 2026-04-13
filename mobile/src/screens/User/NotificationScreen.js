@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, ArrowLeft, MoreVertical } from 'lucide-react-native';
@@ -6,10 +6,11 @@ import client from '../../api/client';
 import { COLORS } from '../../utils/constants';
 import { useRealtime } from '../../context/RealtimeContext';
 
-const NotificationScreen = ({ navigation }) => {
+const NotificationScreen = ({ navigation, route }) => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const { revision } = useRealtime();
+  const lastAutoMarkedId = useRef(null);
 
   useEffect(() => {
     fetchNotifications();
@@ -69,8 +70,44 @@ const NotificationScreen = ({ navigation }) => {
     ]);
   };
 
+  const markAsRead = async (notificationId) => {
+    await client.patch(`/notifications/${notificationId}/read`);
+    setNotifications((prev) =>
+      prev.map((item) => (item._id === notificationId ? { ...item, isRead: true } : item))
+    );
+  };
+
+  const handleNotificationPress = async (item) => {
+    try {
+      if (!item.isRead) {
+        await markAsRead(item._id);
+      }
+    } catch (err) {
+      console.error('Mark notification read error:', err);
+      Alert.alert('Error', 'Failed to update notification state');
+    }
+  };
+
+  useEffect(() => {
+    const notificationId = route?.params?.notificationId;
+    if (!notificationId) return;
+    if (lastAutoMarkedId.current === notificationId) return;
+
+    const target = notifications.find((item) => item._id === notificationId);
+    if (!target || target.isRead) return;
+
+    lastAutoMarkedId.current = notificationId;
+    markAsRead(notificationId).catch((err) => {
+      console.error('Auto mark notification read error:', err);
+    });
+  }, [route?.params?.notificationId, notifications]);
+
   const renderItem = ({ item }) => (
-    <View style={[styles.item, !item.isRead && styles.unread]}>
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={() => handleNotificationPress(item)}
+      style={[styles.item, !item.isRead && styles.unread]}
+    >
       <View style={styles.iconContainer}>
         <Bell size={20} color={!item.isRead ? COLORS.primary : COLORS.gray} />
       </View>
@@ -80,7 +117,7 @@ const NotificationScreen = ({ navigation }) => {
         <Text style={styles.time}>{new Date(item.createdAt).toLocaleString()}</Text>
       </View>
       {!item.isRead && <View style={styles.dot} />}
-    </View>
+    </TouchableOpacity>
   );
 
   return (

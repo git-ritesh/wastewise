@@ -45,3 +45,10 @@ export const showLocalNotification = async ({ title, message, data = {} }) => {
     trigger: null,
   });
 };
+
+export const registerNotificationResponseHandler = (onPress) => {
+  return Notifications.addNotificationResponseReceivedListener((response) => {
+    const data = response?.notification?.request?.content?.data || {};
+    onPress?.(data, response);
+  });
+};
