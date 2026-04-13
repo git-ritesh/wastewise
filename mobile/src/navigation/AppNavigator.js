@@ -14,6 +14,7 @@ import MapScreen from '../screens/User/MapScreen';
 import ReportGarbageScreen from '../screens/User/ReportGarbageScreen';
 import NotificationScreen from '../screens/User/NotificationScreen';
 import RewardScreen from '../screens/User/RewardScreen';
+import AdminDashboard from '../screens/Admin/AdminDashboard';
 
 // Collector Screens
 import CollectorDashboard from '../screens/Collector/CollectorDashboard';
@@ -41,7 +42,12 @@ const AppNavigator = () => {
       headerStyle: { backgroundColor: '#fff', elevation: 0, shadowOpacity: 0 }
     }}>
       {token ? (
-        user?.role === 'collector' ? (
+        user?.role === 'admin' ? (
+          // Admin Routes
+          <Stack.Group>
+            <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
+          </Stack.Group>
+        ) : user?.role === 'collector' ? (
           // Collector Routes
           <Stack.Group>
             <Stack.Screen name="CollectorDashboard" component={CollectorDashboard} />

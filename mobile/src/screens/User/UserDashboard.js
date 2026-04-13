@@ -18,7 +18,8 @@ import {
   MapPin, 
   Award, 
   LogOut,
-  TrendingUp
+  TrendingUp,
+  Medal
 } from 'lucide-react-native';
 import { logout } from '../../redux/authSlice';
 import { COLORS } from '../../utils/constants';
@@ -28,6 +29,7 @@ const UserDashboard = ({ navigation }) => {
   const dispatch = useDispatch();
   const user = useSelector(state => state.auth.user);
   const [dashboardData, setDashboardData] = useState(null);
+  const [leaderboardData, setLeaderboardData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -36,6 +38,11 @@ const UserDashboard = ({ navigation }) => {
       const res = await client.get('/dashboard');
       if (res.data.success) {
         setDashboardData(res.data.data);
+      }
+
+      const leaderboardRes = await client.get('/dashboard/leaderboard?limit=5');
+      if (leaderboardRes.data.success) {
+        setLeaderboardData(leaderboardRes.data.data.leaderboard || []);
       }
     } catch (err) {
       console.error('Fetch dashboard error:', err);
@@ -96,19 +103,18 @@ const UserDashboard = ({ navigation }) => {
               </View>
             </View>
 
-            <View style={styles.pointsCard}>
-              <View style={styles.pointsInfo}>
-                <Text style={styles.pointsTitle}>Your Balance</Text>
-                <View style={styles.pointsRow}>
-                  <Text style={styles.pointsValue}>{dashboardData?.user?.rewardPoints || 0}</Text>
-                  <Text style={styles.pointsUnit}> Points</Text>
-                </View>
-                <TouchableOpacity style={styles.redeemBtn} onPress={() => navigation.navigate('Rewards')}>
-                  <Text style={styles.redeemText}>Earn more ➔</Text>
-                </TouchableOpacity>
+            <View style={styles.impactCard}>
+              <View style={styles.impactItem}>
+                <Text style={styles.impactLabel}>Community Rank</Text>
+                <Text style={styles.impactValue}>#{dashboardData?.leaderboard?.position || '-'}</Text>
+              </View>
+              <View style={styles.impactDivider} />
+              <View style={styles.impactItem}>
+                <Text style={styles.impactLabel}>Reports Completed</Text>
+                <Text style={styles.impactValue}>{dashboardData?.stats?.completed || 0}</Text>
               </View>
               <View style={styles.chartPlaceholder}>
-                <TrendingUp size={60} color="rgba(255,255,255,0.3)" />
+                <TrendingUp size={40} color="rgba(255,255,255,0.25)" />
               </View>
             </View>
           </SafeAreaView>
@@ -153,6 +159,31 @@ const UserDashboard = ({ navigation }) => {
               <Text style={styles.actionDesc}>View nearby dustbins</Text>
             </TouchableOpacity>
           </View>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>User Leaderboard</Text>
+          </View>
+
+          {leaderboardData.length > 0 ? (
+            leaderboardData.map((entry) => (
+              <View key={entry.id} style={styles.historyRow}>
+                <View style={styles.historyIcon}>
+                  <Medal size={18} color="#F59E0B" />
+                </View>
+                <View style={styles.historyContent}>
+                  <Text style={styles.historyName}>#{entry.rank} {entry.name}</Text>
+                  <Text style={styles.historyDate}>Member since {new Date(entry.memberSince).toLocaleDateString()}</Text>
+                </View>
+                <Text style={styles.historyPoints}>{entry.rewardPoints}</Text>
+              </View>
+            ))
+          ) : (
+            <View style={styles.emptyActivity}>
+              <Text style={styles.emptyText}>Leaderboard data is not available yet.</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.section}>
@@ -203,14 +234,11 @@ const styles = StyleSheet.create({
   topActions: { flexDirection: 'row', gap: 12 },
   iconCircle: { width: 45, height: 45, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
   badge: { position: 'absolute', top: 12, right: 12, width: 8, height: 8, backgroundColor: '#EF4444', borderRadius: 4, borderWidth: 2, borderColor: '#10B981' },
-  pointsCard: { backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 25, padding: 25, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
-  pointsInfo: { flex: 1 },
-  pointsTitle: { color: 'rgba(255,255,255,0.8)', fontSize: 14, fontFamily: 'Inter_400Regular' },
-  pointsRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 5 },
-  pointsValue: { color: '#fff', fontSize: 32, fontFamily: 'Outfit_700Bold' },
-  pointsUnit: { color: 'rgba(255,255,255,0.8)', fontSize: 16, fontFamily: 'Outfit_600SemiBold' },
-  redeemBtn: { backgroundColor: '#fff', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 12, alignSelf: 'flex-start', marginTop: 15 },
-  redeemText: { color: '#064E3B', fontSize: 12, fontFamily: 'Outfit_700Bold' },
+  impactCard: { backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 25, padding: 20, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+  impactItem: { flex: 1 },
+  impactLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontFamily: 'Inter_400Regular' },
+  impactValue: { color: '#fff', fontSize: 28, fontFamily: 'Outfit_700Bold', marginTop: 4 },
+  impactDivider: { width: 1, height: 45, backgroundColor: 'rgba(255,255,255,0.25)', marginHorizontal: 12 },
   statsRow: { flexDirection: 'row', paddingHorizontal: 25, marginTop: -30, gap: 15 },
   statBox: { flex: 1, backgroundColor: '#fff', borderRadius: 20, padding: 15, flexDirection: 'row', alignItems: 'center', gap: 12, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 5 },
   statIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
