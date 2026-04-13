@@ -1,6 +1,6 @@
 const GarbageReport = require('../models/GarbageReport.js');
 const User = require('../models/User.js');
-const { sendNotification } = require('../services/notificationService.js');
+const { sendNotification, emitSocketEvent } = require('../services/notificationService.js');
 
 const extractImageUrls = (report) => {
   if (!report) return [];
@@ -135,6 +135,14 @@ const getAllReports = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching reports'
+    });
+
+    emitSocketEvent('data:update', {
+      scope: 'all',
+      entity: 'report',
+      action: 'status-updated',
+      reportId: updatedReport._id.toString(),
+      status: updatedReport.status
     });
   }
 };
@@ -369,6 +377,14 @@ const rejectReport = async (req, res) => {
       success: true,
       message: 'Report rejected successfully'
     });
+
+    emitSocketEvent('data:update', {
+      scope: 'all',
+      entity: 'report',
+      action: 'rejected',
+      reportId: report._id.toString(),
+      status: 'cancelled'
+    });
   } catch (error) {
     console.error('Reject report error:', error);
     res.status(500).json({
@@ -483,6 +499,13 @@ const deleteUser = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'User deleted successfully'
+    });
+
+    emitSocketEvent('data:update', {
+      scope: 'all',
+      entity: 'user',
+      action: 'deleted',
+      userId: id
     });
   } catch (error) {
     console.error('Delete user error:', error);

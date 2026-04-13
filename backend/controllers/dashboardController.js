@@ -1,5 +1,6 @@
 const GarbageReport = require('../models/GarbageReport.js');
 const User = require('../models/User.js');
+const { emitSocketEvent, sendNotification } = require('../services/notificationService.js');
 
 // @desc    Get user dashboard data
 // @route   GET /api/dashboard
@@ -233,6 +234,14 @@ const createReport = async (req, res) => {
       message: 'Report submitted successfully',
       data: report
     });
+
+    emitSocketEvent('data:update', {
+      scope: 'all',
+      entity: 'report',
+      action: 'created',
+      reportId: report._id.toString(),
+      userId: req.user.id
+    });
   } catch (error) {
     console.error('Create report error:', error);
     res.status(500).json({
@@ -302,6 +311,14 @@ const cancelReport = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Report cancelled successfully'
+    });
+
+    emitSocketEvent('data:update', {
+      scope: 'all',
+      entity: 'report',
+      action: 'cancelled',
+      reportId: report._id.toString(),
+      userId: req.user.id
     });
   } catch (error) {
     console.error('Cancel report error:', error);
@@ -384,6 +401,13 @@ const updateProfile = async (req, res) => {
         avatar: user.avatar,
         address: user.address
       }
+    });
+
+    emitSocketEvent('data:update', {
+      scope: 'all',
+      entity: 'user',
+      action: 'profile-updated',
+      userId: user._id.toString()
     });
   } catch (error) {
     console.error('Update profile error:', error);

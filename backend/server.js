@@ -2,7 +2,10 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
+const http = require('http');
+const { Server } = require('socket.io');
 const connectDB = require('./config/db.js');
+const { setSocketIO } = require('./services/notificationService.js');
 
 // Load env vars
 dotenv.config();
@@ -11,6 +14,7 @@ dotenv.config();
 connectDB();
 
 const app = express();
+const server = http.createServer(app);
 
 // Middleware
 const defaultAllowedOrigins = [
@@ -24,6 +28,29 @@ const envAllowedOrigins = [
 ].filter(Boolean);
 
 const allowedOrigins = [...new Set([...defaultAllowedOrigins, ...envAllowedOrigins])];
+
+const socketCorsOrigins = [...allowedOrigins, 'http://localhost:8081', 'exp://localhost:8081'];
+
+const io = new Server(server, {
+  cors: {
+    origin: socketCorsOrigins,
+    credentials: true
+  }
+});
+
+setSocketIO(io);
+
+io.on('connection', (socket) => {
+  socket.on('join', (roomId) => {
+    if (roomId) {
+      socket.join(roomId.toString());
+    }
+  });
+
+  socket.on('disconnect', () => {
+    // Intentionally empty: dashboards reconnect automatically.
+  });
+});
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -96,7 +123,7 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📍 API Base URL: http://0.0.0.0:${PORT}/api`);
   console.log(`🏠 Local Network URL: http://192.168.1.107:${PORT}/api`);

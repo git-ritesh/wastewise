@@ -24,6 +24,7 @@ import {
 import { logout } from '../../redux/authSlice';
 import { COLORS } from '../../utils/constants';
 import client from '../../api/client';
+import { useRealtime } from '../../context/RealtimeContext';
 
 const UserDashboard = ({ navigation }) => {
   const dispatch = useDispatch();
@@ -32,6 +33,7 @@ const UserDashboard = ({ navigation }) => {
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const { revision } = useRealtime();
 
   const fetchDashboardData = async () => {
     try {
@@ -55,6 +57,12 @@ const UserDashboard = ({ navigation }) => {
   useEffect(() => {
     fetchDashboardData();
   }, []);
+
+  useEffect(() => {
+    if (revision > 0) {
+      fetchDashboardData();
+    }
+  }, [revision]);
 
   const onRefresh = () => {
     setRefreshing(true);

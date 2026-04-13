@@ -10,6 +10,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { store } from './src/redux/store';
 import { loadUser } from './src/redux/authSlice';
 import AppNavigator from './src/navigation/AppNavigator';
+import { RealtimeProvider } from './src/context/RealtimeContext';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -37,10 +38,12 @@ const Root = () => {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
-        <StatusBar style="dark" />
-        <AppNavigator />
-      </NavigationContainer>
+      <RealtimeProvider>
+        <NavigationContainer>
+          <StatusBar style="dark" />
+          <AppNavigator />
+        </NavigationContainer>
+      </RealtimeProvider>
     </SafeAreaProvider>
   );
 };

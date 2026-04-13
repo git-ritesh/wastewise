@@ -16,6 +16,7 @@ import { LogOut, ClipboardList, MapPin, Clock, ChevronRight } from 'lucide-react
 import client from '../../api/client';
 import { logout } from '../../redux/authSlice';
 import { COLORS } from '../../utils/constants';
+import { useRealtime } from '../../context/RealtimeContext';
 
 const { width } = Dimensions.get('window');
 
@@ -24,6 +25,7 @@ const CollectorDashboard = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const user = useSelector(state => state.auth.user);
   const dispatch = useDispatch();
+  const { revision } = useRealtime();
 
   const fetchTasks = async () => {
     try {
@@ -41,6 +43,12 @@ const CollectorDashboard = ({ navigation }) => {
   useEffect(() => {
     fetchTasks();
   }, []);
+
+  useEffect(() => {
+    if (revision > 0) {
+      fetchTasks();
+    }
+  }, [revision]);
 
   const renderItem = ({ item }) => (
     <TouchableOpacity 

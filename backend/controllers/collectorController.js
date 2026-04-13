@@ -1,7 +1,7 @@
 const User = require('../models/User.js');
 const CollectorProfile = require('../models/CollectorProfile.js');
 const GarbageReport = require('../models/GarbageReport.js');
-const { sendNotification } = require('../services/notificationService.js');
+const { sendNotification, emitSocketEvent } = require('../services/notificationService.js');
 
 // @desc    Get all collectors with profiles
 // @route   GET /api/admin/collectors/manage
@@ -159,6 +159,13 @@ const createCollector = async (req, res) => {
         generatedPassword // Include for admin reference (shown once)
       }
     });
+
+    emitSocketEvent('data:update', {
+      scope: 'all',
+      entity: 'collector',
+      action: 'created',
+      collectorId: user._id.toString()
+    });
   } catch (error) {
     console.error('Create collector error:', error);
     res.status(500).json({
@@ -206,6 +213,13 @@ const updateCollector = async (req, res) => {
       success: true,
       message: 'Collector updated successfully',
       data: { user, profile }
+    });
+
+    emitSocketEvent('data:update', {
+      scope: 'all',
+      entity: 'collector',
+      action: 'updated',
+      collectorId: user._id.toString()
     });
   } catch (error) {
     console.error('Update collector error:', error);
@@ -302,6 +316,13 @@ const deleteCollector = async (req, res) => {
         success: true,
         message: 'Collector permanently deleted'
       });
+
+        emitSocketEvent('data:update', {
+          scope: 'all',
+          entity: 'collector',
+          action: 'deleted',
+          collectorId: user._id.toString()
+        });
     } else {
       // Soft delete - just deactivate
       const profile = await CollectorProfile.findOne({ user: user._id });
@@ -313,6 +334,13 @@ const deleteCollector = async (req, res) => {
       res.status(200).json({
         success: true,
         message: 'Collector deactivated'
+      });
+
+      emitSocketEvent('data:update', {
+        scope: 'all',
+        entity: 'collector',
+        action: 'deactivated',
+        collectorId: user._id.toString()
       });
     }
   } catch (error) {
@@ -353,6 +381,14 @@ const updateCollectorStatus = async (req, res) => {
       success: true,
       message: `Collector status updated to ${status}`,
       data: profile
+    });
+
+    emitSocketEvent('data:update', {
+      scope: 'all',
+      entity: 'collector',
+      action: 'status-updated',
+      collectorId: req.params.id,
+      status
     });
   } catch (error) {
     console.error('Update collector status error:', error);
@@ -495,6 +531,16 @@ const completeTask = async (req, res) => {
       success: true,
       message: 'Task marked as completed',
       data: task
+    });
+
+    emitSocketEvent('data:update', {
+      scope: 'all',
+      entity: 'report',
+      action: 'completed',
+      reportId: task._id.toString(),
+      collectorId: req.user.id,
+      userId: task.user.toString(),
+      points: points
     });
   } catch (error) {
     console.error('Complete task error:', error);

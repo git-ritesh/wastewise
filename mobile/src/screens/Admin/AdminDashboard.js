@@ -31,6 +31,7 @@ import {
 import client from '../../api/client';
 import { logout } from '../../redux/authSlice';
 import { COLORS } from '../../utils/constants';
+import { useRealtime } from '../../context/RealtimeContext';
 
 const REPORT_STATUS_FILTERS = [
   { key: 'all', label: 'All' },
@@ -77,6 +78,7 @@ const AdminDashboard = () => {
   const [newCollectorEmail, setNewCollectorEmail] = useState('');
   const [newCollectorPhone, setNewCollectorPhone] = useState('');
   const [creatingCollector, setCreatingCollector] = useState(false);
+  const { revision } = useRealtime();
 
   const fetchAdminStats = async () => {
     const res = await client.get('/admin/stats');
@@ -126,6 +128,12 @@ const AdminDashboard = () => {
     fetchAll('all');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (revision > 0) {
+      fetchAll(reportFilter);
+    }
+  }, [revision]);
 
   const onRefresh = async () => {
     setRefreshing(true);
