@@ -6,9 +6,13 @@ import {
   TouchableOpacity, 
   StyleSheet, 
   ActivityIndicator, 
-  Image,
+  Alert,
+  Linking,
+  Modal,
+  Platform,
   Dimensions
 } from 'react-native';
+import MapView, { Marker } from 'react-native-maps';
 import { useDispatch, useSelector } from 'react-redux';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,6 +27,8 @@ const { width } = Dimensions.get('window');
 const CollectorDashboard = ({ navigation }) => {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [previewTask, setPreviewTask] = useState(null);
+  const [previewCoords, setPreviewCoords] = useState(null);
   const user = useSelector(state => state.auth.user);
   const dispatch = useDispatch();
   const { revision } = useRealtime();
@@ -50,6 +56,65 @@ const CollectorDashboard = ({ navigation }) => {
     }
   }, [revision]);
 
+  const resolveTaskCoordinates = (task) => {
+    const location = task?.location || {};
+    const coordinates = location.coordinates || {};
+
+    const latCandidate = coordinates.lat ?? location.latitude ?? location.lat;
+    const lngCandidate = coordinates.lng ?? location.longitude ?? location.lng;
+
+    const lat = Number(latCandidate);
+    const lng = Number(lngCandidate);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return null;
+    }
+
+    if (lat === 0 && lng === 0) {
+      return null;
+    }
+
+    return { lat, lng };
+  };
+
+  const openNavigation = async (coords) => {
+    if (!coords) {
+      Alert.alert('Location Missing', 'This task does not have valid coordinates for navigation.');
+      return;
+    }
+
+    const { lat, lng } = coords;
+    const primaryUrl = Platform.OS === 'android'
+      ? `google.navigation:q=${lat},${lng}`
+      : `http://maps.apple.com/?daddr=${lat},${lng}`;
+    const fallbackUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+
+    try {
+      const canOpenPrimary = await Linking.canOpenURL(primaryUrl);
+      await Linking.openURL(canOpenPrimary ? primaryUrl : fallbackUrl);
+    } catch (error) {
+      console.error('Navigation launch error:', error);
+      Alert.alert('Navigation Error', 'Unable to open map navigation right now.');
+    }
+  };
+
+  const openPreview = (task) => {
+    const coords = resolveTaskCoordinates(task);
+
+    if (!coords) {
+      Alert.alert('Location Missing', 'This task does not have valid coordinates for navigation.');
+      return;
+    }
+
+    setPreviewTask(task);
+    setPreviewCoords(coords);
+  };
+
+  const closePreview = () => {
+    setPreviewTask(null);
+    setPreviewCoords(null);
+  };
+
   const renderItem = ({ item }) => (
     <TouchableOpacity 
       style={styles.card} 
@@ -73,7 +138,13 @@ const CollectorDashboard = ({ navigation }) => {
           <MapPin size={14} color="#94A3B8" />
           <Text style={styles.infoText} numberOfLines={1}>{item.location?.address || 'View on Map'}</Text>
         </View>
-        <ChevronRight size={18} color="#CBD5E1" />
+        <TouchableOpacity
+          style={styles.navigateBtn}
+          onPress={() => openPreview(item)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.navigateBtnText}>Preview</Text>
+        </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
@@ -121,6 +192,57 @@ const CollectorDashboard = ({ navigation }) => {
           />
         )}
       </View>
+
+      <Modal
+        visible={!!previewTask && !!previewCoords}
+        transparent
+        animationType="slide"
+        onRequestClose={closePreview}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Route Preview</Text>
+            <Text style={styles.modalSubtitle} numberOfLines={2}>
+              {previewTask?.location?.address || 'Selected destination'}
+            </Text>
+
+            {previewCoords && (
+              <MapView
+                style={styles.previewMap}
+                initialRegion={{
+                  latitude: previewCoords.lat,
+                  longitude: previewCoords.lng,
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01
+                }}
+              >
+                <Marker
+                  coordinate={{
+                    latitude: previewCoords.lat,
+                    longitude: previewCoords.lng
+                  }}
+                  title={previewTask?.title || 'Destination'}
+                  description={previewTask?.location?.address || 'Task destination'}
+                />
+              </MapView>
+            )}
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalBtnOutline} onPress={closePreview}>
+                <Text style={styles.modalBtnOutlineText}>Close</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalBtnPrimary}
+                onPress={async () => {
+                  await openNavigation(previewCoords);
+                }}
+              >
+                <Text style={styles.modalBtnPrimaryText}>Open in Google Maps</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -157,6 +279,18 @@ const styles = StyleSheet.create({
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 15, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 },
   infoText: { fontSize: 12, fontFamily: 'Inter_400Regular', color: '#94A3B8' },
+  navigateBtn: { backgroundColor: '#ECFDF5', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  navigateBtnText: { color: '#047857', fontSize: 11, fontFamily: 'Outfit_700Bold' },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.5)', justifyContent: 'center', padding: 20 },
+  modalCard: { backgroundColor: '#fff', borderRadius: 20, padding: 16, elevation: 10 },
+  modalTitle: { fontSize: 18, color: '#0F172A', fontFamily: 'Outfit_700Bold' },
+  modalSubtitle: { marginTop: 4, marginBottom: 12, color: '#64748B', fontSize: 13, fontFamily: 'Inter_400Regular' },
+  previewMap: { width: '100%', height: 220, borderRadius: 14, overflow: 'hidden' },
+  modalActions: { marginTop: 14, flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
+  modalBtnOutline: { flex: 1, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
+  modalBtnOutlineText: { color: '#334155', fontSize: 13, fontFamily: 'Outfit_600SemiBold' },
+  modalBtnPrimary: { flex: 1.4, backgroundColor: '#059669', borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
+  modalBtnPrimaryText: { color: '#fff', fontSize: 13, fontFamily: 'Outfit_700Bold' },
   badge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, gap: 5 },
   badgeDot: { width: 6, height: 6, borderRadius: 3 },
   badgeText: { fontSize: 10, fontFamily: 'Outfit_700Bold' },
