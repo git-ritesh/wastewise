@@ -86,17 +86,26 @@ const ReportGarbageScreen = ({ navigation }) => {
       return;
     }
 
+    if (!location || location.latitude == null || location.longitude == null) {
+      Alert.alert('Location Required', 'Please wait for GPS location to be captured before submitting.');
+      return;
+    }
+
     setLoading(true);
     const formData = new FormData();
+    const locationPayload = {
+      latitude: location.latitude,
+      longitude: location.longitude,
+      address: 'Pinned Location'
+    };
+
+    console.log('📍 [Mobile ReportGarbageScreen] Location payload being submitted:', locationPayload);
+
     formData.append('title', title);
     formData.append('description', description);
     formData.append('wasteType', wasteType);
     formData.append('estimatedWeight', weight);
-    formData.append('location', JSON.stringify({
-      latitude: location?.latitude || 0,
-      longitude: location?.longitude || 0,
-      address: 'Pinned Location'
-    }));
+    formData.append('location', JSON.stringify(locationPayload));
     
     // Append the photo
     const uriParts = photo.split('.');
@@ -116,6 +125,7 @@ const ReportGarbageScreen = ({ navigation }) => {
         transformRequest: (data) => data, // Essential for FormData in some axios versions
       });
       if (res.data.success) {
+        console.log('📍 [Mobile ReportGarbageScreen] Location returned from backend:', res?.data?.data?.location);
         Alert.alert('Success', 'Report submitted successfully!', [
           { text: 'OK', onPress: () => navigation.goBack() }
         ]);

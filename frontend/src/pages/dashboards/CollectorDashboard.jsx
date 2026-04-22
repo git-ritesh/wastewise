@@ -85,7 +85,7 @@ const CollectorDashboard = () => {
   };
 
   const handleOpenMap = (task) => {
-    if (!task?.location?.coordinates?.lat) return;
+    if (task?.location?.coordinates?.lat == null || task?.location?.coordinates?.lng == null) return;
     setNavigationTask(task);
     setCurrentPosition(null);
     setTrackingError('');
@@ -391,7 +391,7 @@ const CollectorDashboard = () => {
             </div>
 
             <div className="navigation-map-wrap">
-              {navigationTask.location?.coordinates?.lat && navigationTask.location?.coordinates?.lng ? (
+              {navigationTask.location?.coordinates?.lat != null && navigationTask.location?.coordinates?.lng != null ? (
                 <CollectorLiveMap
                   destination={{
                     lat: navigationTask.location.coordinates.lat,

@@ -424,10 +424,10 @@ const getCollectorTasks = async (req, res) => {
     // Ensure all tasks have location data (for backward compatibility)
     tasks = tasks.map(task => {
       if (!task.location) {
-        task.location = { address: 'No address provided', coordinates: { lat: 0, lng: 0 } };
+        task.location = { address: 'No address provided', coordinates: null };
       }
       if (!task.location.coordinates) {
-        task.location.coordinates = { lat: 0, lng: 0 };
+        task.location.coordinates = null;
       }
       return task;
     });

@@ -225,11 +225,40 @@ const ReportForm = ({ onSubmit, onCancel }) => {
         console.log('⚠️ No images selected');
       }
 
+      const lat = Number(formData.location.coordinates.lat);
+      const lng = Number(formData.location.coordinates.lng);
+
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        setMessage('Location coordinates are invalid. Please refresh GPS and try again.');
+        setLoading(false);
+        return;
+      }
+
       // Submit report with image URLs
+      // Send coordinates in multiple compatible shapes for backend parity.
       const reportData = {
         ...formData,
+        location: {
+          ...formData.location,
+          latitude: lat,
+          longitude: lng,
+          lat,
+          lng,
+          coordinates: {
+            lat,
+            lng
+          }
+        },
         images: imageUrls
       };
+      console.log('📍 [ReportForm] Location payload being submitted:', {
+        address: reportData.location.address,
+        latitude: reportData.location.latitude,
+        longitude: reportData.location.longitude,
+        lat: reportData.location.lat,
+        lng: reportData.location.lng,
+        coordinates: reportData.location.coordinates
+      });
       console.log('📤 Sending report to backend:', reportData);
       await onSubmit(reportData);
     } catch (error) {

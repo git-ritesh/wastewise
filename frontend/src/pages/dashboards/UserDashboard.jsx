@@ -65,7 +65,8 @@ const UserDashboard = () => {
   const handleCreateReport = async (reportData) => {
     try {
       console.log('📤 Submitting report...');
-      await dashboardAPI.createReport(reportData);
+      const response = await dashboardAPI.createReport(reportData);
+      console.log('📍 [UserDashboard] Location returned from backend:', response?.data?.data?.location);
       console.log('✅ Report created successfully');
       setShowCreateModal(false);
       fetchReports(activeTab);

@@ -1,6 +1,66 @@
 const GarbageReport = require('../models/GarbageReport.js');
 const User = require('../models/User.js');
 const { emitSocketEvent, sendNotification } = require('../services/notificationService.js');
+const https = require('https');
+
+const geocodeAddress = async (address) => {
+  const trimmedAddress = typeof address === 'string' ? address.trim() : '';
+
+  if (!trimmedAddress) {
+    return null;
+  }
+
+  const url = new URL('https://nominatim.openstreetmap.org/search');
+  url.searchParams.set('format', 'json');
+  url.searchParams.set('limit', '1');
+  url.searchParams.set('q', trimmedAddress);
+
+  return new Promise((resolve) => {
+    const request = https.get(url, {
+      headers: {
+        'User-Agent': 'WasteWise/1.0'
+      }
+    }, (response) => {
+      let rawData = '';
+
+      response.on('data', (chunk) => {
+        rawData += chunk;
+      });
+
+      response.on('end', () => {
+        try {
+          const results = JSON.parse(rawData);
+          const firstResult = Array.isArray(results) ? results[0] : null;
+
+          if (!firstResult) {
+            return resolve(null);
+          }
+
+          const lat = Number(firstResult.lat);
+          const lng = Number(firstResult.lon);
+
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+            return resolve(null);
+          }
+
+          resolve({ lat, lng });
+        } catch (error) {
+          console.error('Geocoding parse error:', error.message);
+          resolve(null);
+        }
+      });
+    });
+
+    request.on('error', (error) => {
+      console.error('Geocoding request error:', error.message);
+      resolve(null);
+    });
+
+    request.setTimeout(3000, () => {
+      request.destroy(new Error('Geocoding request timed out'));
+    });
+  });
+};
 
 // @desc    Get user dashboard data
 // @route   GET /api/dashboard
@@ -152,18 +212,57 @@ const createReport = async (req, res) => {
       }
     }
 
-    // Map location fields correctly to schema
-    // Allow 0,0 as valid coordinates (user pinned location) or auto-captured GPS
-    const lat = location?.latitude != null ? location.latitude : location?.lat;
-    const lng = location?.longitude != null ? location.longitude : location?.lng;
-    
+    console.log('📍 [createReport] Incoming location payload:', location);
+
+    // Normalize location from web/mobile payloads:
+    // - { location: { coordinates: { lat, lng }, address } }
+    // - { location: { latitude, longitude, address } }
+    // - { location: { lat, lng, address } }
+    const parseCoordinate = (value) => {
+      if (value === null || value === undefined || value === '') return null;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+
+    const sourceCoordinates =
+      location?.coordinates ||
+      location ||
+      req.body.coordinates ||
+      {};
+
+    const lat = parseCoordinate(
+      sourceCoordinates.lat ?? sourceCoordinates.latitude
+    );
+    const lng = parseCoordinate(
+      sourceCoordinates.lng ?? sourceCoordinates.longitude ?? sourceCoordinates.lon ?? sourceCoordinates.long
+    );
+
+    console.log('📍 [createReport] Parsed coordinates:', { lat, lng });
+
+    const hasValidCoordinates = lat !== null && lng !== null && !(lat === 0 && lng === 0);
+    let resolvedCoordinates = hasValidCoordinates ? { lat, lng } : null;
+
+    if (!resolvedCoordinates) {
+      resolvedCoordinates = await geocodeAddress(location?.address || req.body.address);
+      console.log('📍 [createReport] Geocoded coordinates from address:', resolvedCoordinates);
+    }
+
+    if (!resolvedCoordinates) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid latitude and longitude are required for report location'
+      });
+    }
+
     const formattedLocation = {
-      address: location?.address || 'Pinned Location',
+      address: location?.address || req.body.address || 'Pinned Location',
       coordinates: {
-        lat: lat ?? 0,
-        lng: lng ?? 0
+        lat: resolvedCoordinates.lat,
+        lng: resolvedCoordinates.lng
       }
     };
+
+    console.log('📍 [createReport] Location that will be saved:', formattedLocation);
 
     // Handle images from either multipart uploads (req.files) or JSON body (Cloudinary URLs)
     let imageUrls = [];
@@ -226,6 +325,8 @@ const createReport = async (req, res) => {
       images: imageUrls,
       scheduledDate
     });
+
+    console.log('📍 [createReport] Location saved in DB:', report.location);
 
     console.log('✅ Report created with images:', report.images);
 
