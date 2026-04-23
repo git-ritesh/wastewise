@@ -10,12 +10,12 @@ import {
   ActivityIndicator, 
   Alert,
   Linking,
-  Modal,
   Platform,
   Dimensions
 } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, Polyline } from 'react-native-maps';
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Camera, MapPin, CheckCircle2 } from 'lucide-react-native';
 import client from '../../api/client';
@@ -30,7 +30,10 @@ const TaskDetailScreen = ({ route, navigation }) => {
   const [image, setImage] = useState(null);
   const [note, setNote] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [showMapPreview, setShowMapPreview] = useState(false);
+  const [isTracking, setIsTracking] = useState(false);
+  const [currentPosition, setCurrentPosition] = useState(null);
+  const [trackingError, setTrackingError] = useState('');
+  const [trackingDistanceKm, setTrackingDistanceKm] = useState(null);
   const { revision } = useRealtime();
 
   const refreshTaskState = async () => {
@@ -118,6 +121,87 @@ const TaskDetailScreen = ({ route, navigation }) => {
     return { lat, lng };
   };
 
+  const calculateDistanceKm = (origin, destination) => {
+    if (!origin || !destination) return null;
+
+    const toRadians = (value) => (value * Math.PI) / 180;
+    const earthRadiusKm = 6371;
+    const latDelta = toRadians(destination.lat - origin.lat);
+    const lngDelta = toRadians(destination.lng - origin.lng);
+
+    const a =
+      Math.sin(latDelta / 2) * Math.sin(latDelta / 2) +
+      Math.cos(toRadians(origin.lat)) *
+        Math.cos(toRadians(destination.lat)) *
+        Math.sin(lngDelta / 2) *
+        Math.sin(lngDelta / 2);
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return earthRadiusKm * c;
+  };
+
+  useEffect(() => {
+    let locationSubscription;
+
+    const startTracking = async () => {
+      const destination = resolveTaskCoordinates();
+      if (!destination) {
+        setTrackingError('Destination coordinates are missing for this task.');
+        return;
+      }
+
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== 'granted') {
+        setTrackingError('Location permission is required for live map tracking.');
+        return;
+      }
+
+      setTrackingError('');
+      setIsTracking(true);
+
+      const initialLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const initialPoint = {
+        lat: initialLocation.coords.latitude,
+        lng: initialLocation.coords.longitude,
+      };
+      setCurrentPosition(initialPoint);
+      setTrackingDistanceKm(calculateDistanceKm(initialPoint, destination));
+
+      locationSubscription = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.Balanced,
+          timeInterval: 5000,
+          distanceInterval: 10,
+        },
+        (position) => {
+          const point = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          };
+
+          setCurrentPosition(point);
+          setTrackingDistanceKm(calculateDistanceKm(point, destination));
+        }
+      );
+    };
+
+    startTracking().catch((error) => {
+      console.error('Live tracking error:', error);
+      setTrackingError('Unable to start live tracking right now.');
+      setIsTracking(false);
+    });
+
+    return () => {
+      if (locationSubscription) {
+        locationSubscription.remove();
+      }
+      setIsTracking(false);
+    };
+  }, [taskState._id]);
+
   const handleNavigate = async () => {
     const coords = resolveTaskCoordinates();
 
@@ -141,14 +225,21 @@ const TaskDetailScreen = ({ route, navigation }) => {
     }
   };
 
-  const handleOpenPreview = () => {
-    const coords = resolveTaskCoordinates();
-    if (!coords) {
-      Alert.alert('Location Missing', 'This task does not have valid coordinates for navigation.');
-      return;
-    }
-    setShowMapPreview(true);
-  };
+  const destinationCoords = resolveTaskCoordinates();
+
+  const trackingPoints = [];
+  if (currentPosition) {
+    trackingPoints.push({
+      latitude: currentPosition.lat,
+      longitude: currentPosition.lng,
+    });
+  }
+  if (destinationCoords) {
+    trackingPoints.push({
+      latitude: destinationCoords.lat,
+      longitude: destinationCoords.lng,
+    });
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -186,9 +277,83 @@ const TaskDetailScreen = ({ route, navigation }) => {
             </View>
           </View>
 
-          <TouchableOpacity style={styles.navigateButton} onPress={handleOpenPreview} activeOpacity={0.8}>
-            <Text style={styles.navigateButtonText}>Preview Route</Text>
-          </TouchableOpacity>
+          <Text style={styles.navSectionTitle}>Navigation</Text>
+          <View style={styles.navActionRow}>
+            <TouchableOpacity style={styles.googleMapsButton} onPress={handleNavigate} activeOpacity={0.85}>
+              <Text style={styles.googleMapsButtonText}>Google Maps</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.liveMapSection}>
+            <Text style={styles.liveMapTitle}>Live Map Tracking</Text>
+            <Text style={styles.liveMapMeta}>
+              {destinationCoords
+                ? taskState.location?.address || 'Task destination'
+                : 'Location unavailable for this task'}
+            </Text>
+
+            {trackingError ? <Text style={styles.trackingErrorText}>{trackingError}</Text> : null}
+
+            <View style={styles.trackingInfoRow}>
+              <View style={styles.trackingBadge}>
+                <Text style={styles.trackingBadgeLabel}>Tracking</Text>
+                <Text style={styles.trackingBadgeValue}>{isTracking ? 'LIVE' : 'OFF'}</Text>
+              </View>
+              <View style={styles.trackingBadge}>
+                <Text style={styles.trackingBadgeLabel}>Distance</Text>
+                <Text style={styles.trackingBadgeValue}>
+                  {trackingDistanceKm != null ? `${trackingDistanceKm.toFixed(2)} km` : '--'}
+                </Text>
+              </View>
+            </View>
+
+            {destinationCoords ? (
+              <MapView
+                style={styles.inlineMap}
+                initialRegion={{
+                  latitude: destinationCoords.lat,
+                  longitude: destinationCoords.lng,
+                  latitudeDelta: 0.02,
+                  longitudeDelta: 0.02,
+                }}
+                showsUserLocation
+                showsMyLocationButton
+              >
+                <Marker
+                  coordinate={{
+                    latitude: destinationCoords.lat,
+                    longitude: destinationCoords.lng,
+                  }}
+                  title={taskState.title || 'Destination'}
+                  description={taskState.location?.address || 'Task destination'}
+                />
+
+                {currentPosition ? (
+                  <Marker
+                    coordinate={{
+                      latitude: currentPosition.lat,
+                      longitude: currentPosition.lng,
+                    }}
+                    pinColor="#10B981"
+                    title="Current position"
+                    description="Collector live location"
+                  />
+                ) : null}
+
+                {trackingPoints.length === 2 ? (
+                  <Polyline
+                    coordinates={trackingPoints}
+                    strokeColor="#22C55E"
+                    strokeWidth={4}
+                  />
+                ) : null}
+              </MapView>
+            ) : (
+              <View style={styles.mapFallbackBox}>
+                <Text style={styles.mapFallbackText}>Unable to load map preview for this task.</Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {taskState.status !== 'completed' && (
@@ -239,58 +404,6 @@ const TaskDetailScreen = ({ route, navigation }) => {
         )}
       </ScrollView>
 
-      <Modal
-        visible={showMapPreview}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowMapPreview(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Route Preview</Text>
-            <Text style={styles.modalSubtitle} numberOfLines={2}>
-              {taskState.location?.address || 'Selected destination'}
-            </Text>
-
-            {(() => {
-              const coords = resolveTaskCoordinates();
-              if (!coords) return null;
-
-              return (
-                <MapView
-                  style={styles.previewMap}
-                  initialRegion={{
-                    latitude: coords.lat,
-                    longitude: coords.lng,
-                    latitudeDelta: 0.01,
-                    longitudeDelta: 0.01
-                  }}
-                >
-                  <Marker
-                    coordinate={{ latitude: coords.lat, longitude: coords.lng }}
-                    title={taskState.title || 'Destination'}
-                    description={taskState.location?.address || 'Task destination'}
-                  />
-                </MapView>
-              );
-            })()}
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalBtnOutline} onPress={() => setShowMapPreview(false)}>
-                <Text style={styles.modalBtnOutlineText}>Close</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalBtnPrimary}
-                onPress={async () => {
-                  await handleNavigate();
-                }}
-              >
-                <Text style={styles.modalBtnPrimaryText}>Open in Google Maps</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 };
@@ -314,18 +427,21 @@ const styles = StyleSheet.create({
   infoTextContainer: { flex: 1 },
   infoLabel: { fontSize: 12, color: '#94A3B8', fontFamily: 'Inter_400Regular', marginBottom: 2 },
   infoValue: { fontSize: 15, color: '#1E293B', fontFamily: 'Outfit_600SemiBold' },
-  navigateButton: { marginTop: 16, backgroundColor: '#ECFDF5', paddingVertical: 12, borderRadius: 14, alignItems: 'center' },
-  navigateButtonText: { fontSize: 14, color: '#047857', fontFamily: 'Outfit_700Bold' },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.5)', justifyContent: 'center', padding: 20 },
-  modalCard: { backgroundColor: '#fff', borderRadius: 20, padding: 16, elevation: 10 },
-  modalTitle: { fontSize: 18, color: '#0F172A', fontFamily: 'Outfit_700Bold' },
-  modalSubtitle: { marginTop: 4, marginBottom: 12, color: '#64748B', fontSize: 13, fontFamily: 'Inter_400Regular' },
-  previewMap: { width: '100%', height: 220, borderRadius: 14, overflow: 'hidden' },
-  modalActions: { marginTop: 14, flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
-  modalBtnOutline: { flex: 1, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
-  modalBtnOutlineText: { color: '#334155', fontSize: 13, fontFamily: 'Outfit_600SemiBold' },
-  modalBtnPrimary: { flex: 1.4, backgroundColor: '#059669', borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
-  modalBtnPrimaryText: { color: '#fff', fontSize: 13, fontFamily: 'Outfit_700Bold' },
+  navSectionTitle: { marginTop: 16, marginBottom: 10, fontSize: 13, color: '#94A3B8', fontFamily: 'Outfit_600SemiBold' },
+  navActionRow: { flexDirection: 'row', gap: 10 },
+  googleMapsButton: { flex: 1, backgroundColor: '#EEF2FF', paddingVertical: 12, borderRadius: 14, alignItems: 'center' },
+  googleMapsButtonText: { fontSize: 13, color: '#3730A3', fontFamily: 'Outfit_700Bold' },
+  liveMapSection: { marginTop: 18, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#E2E8F0' },
+  liveMapTitle: { fontSize: 16, color: '#0F172A', fontFamily: 'Outfit_700Bold' },
+  liveMapMeta: { marginTop: 4, marginBottom: 10, color: '#64748B', fontSize: 13, fontFamily: 'Inter_400Regular' },
+  trackingInfoRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  trackingBadge: { flex: 1, backgroundColor: '#F8FAFC', borderRadius: 12, paddingVertical: 8, paddingHorizontal: 10, borderWidth: 1, borderColor: '#E2E8F0' },
+  trackingBadgeLabel: { fontSize: 11, color: '#64748B', fontFamily: 'Inter_400Regular' },
+  trackingBadgeValue: { marginTop: 2, fontSize: 13, color: '#0F172A', fontFamily: 'Outfit_700Bold' },
+  trackingErrorText: { marginBottom: 10, color: '#B91C1C', fontSize: 12, fontFamily: 'Inter_400Regular' },
+  inlineMap: { width: '100%', height: 230, borderRadius: 14, overflow: 'hidden' },
+  mapFallbackBox: { height: 120, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' },
+  mapFallbackText: { color: '#64748B', fontSize: 13, fontFamily: 'Inter_400Regular' },
   completionSection: { paddingHorizontal: 25 },
   sectionTitle: { fontSize: 18, fontFamily: 'Outfit_700Bold', color: '#1E293B', marginBottom: 15 },
   imagePicker: { height: 240, backgroundColor: '#fff', borderRadius: 30, overflow: 'hidden', borderStyle: 'dashed', borderWidth: 2, borderColor: '#CBD5E1', marginBottom: 20 },

@@ -16,11 +16,12 @@ import MapView, { Marker } from 'react-native-maps';
 import { useDispatch, useSelector } from 'react-redux';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { LogOut, ClipboardList, MapPin, Clock, ChevronRight } from 'lucide-react-native';
+import { LogOut, ClipboardList, MapPin } from 'lucide-react-native';
 import client from '../../api/client';
 import { logout } from '../../redux/authSlice';
 import { COLORS } from '../../utils/constants';
 import { useRealtime } from '../../context/RealtimeContext';
+import * as Location from 'expo-location';
 
 const { width } = Dimensions.get('window');
 
@@ -115,12 +116,11 @@ const CollectorDashboard = ({ navigation }) => {
     setPreviewCoords(null);
   };
 
-  const renderItem = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.card} 
-      onPress={() => navigation.navigate('TaskDetail', { task: item })}
-      activeOpacity={0.7}
-    >
+  const renderItem = ({ item }) => {
+    const taskCoords = resolveTaskCoordinates(item);
+
+    return (
+    <View style={styles.card}>
       <View style={styles.cardHeader}>
         <View style={styles.taskIcon}>
           <ClipboardList size={22} color={COLORS.primary} />
@@ -138,16 +138,29 @@ const CollectorDashboard = ({ navigation }) => {
           <MapPin size={14} color="#94A3B8" />
           <Text style={styles.infoText} numberOfLines={1}>{item.location?.address || 'View on Map'}</Text>
         </View>
+      </View>
+
+      <View style={styles.cardActions}>
         <TouchableOpacity
-          style={styles.navigateBtn}
-          onPress={() => openPreview(item)}
-          activeOpacity={0.8}
+          style={styles.detailsBtn}
+          onPress={() => navigation.navigate('TaskDetail', { task: item })}
+          activeOpacity={0.85}
         >
-          <Text style={styles.navigateBtnText}>Preview</Text>
+          <Text style={styles.detailsBtnText}>View Details</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.navigateBtn, !taskCoords && styles.actionDisabled]}
+          onPress={() => openPreview(item)}
+          disabled={!taskCoords}
+          activeOpacity={0.85}
+        >
+          <Text style={[styles.navigateBtnText, !taskCoords && styles.actionDisabledText]}>Map Preview</Text>
         </TouchableOpacity>
       </View>
-    </TouchableOpacity>
+    </View>
   );
+  };
 
   return (
     <View style={styles.container}>
@@ -279,8 +292,13 @@ const styles = StyleSheet.create({
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 15, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 },
   infoText: { fontSize: 12, fontFamily: 'Inter_400Regular', color: '#94A3B8' },
-  navigateBtn: { backgroundColor: '#ECFDF5', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
-  navigateBtnText: { color: '#047857', fontSize: 11, fontFamily: 'Outfit_700Bold' },
+  cardActions: { flexDirection: 'row', marginTop: 14, gap: 10 },
+  detailsBtn: { flex: 1, backgroundColor: '#EEF2FF', borderRadius: 10, alignItems: 'center', paddingVertical: 10 },
+  detailsBtnText: { color: '#3730A3', fontSize: 12, fontFamily: 'Outfit_700Bold' },
+  navigateBtn: { flex: 1, backgroundColor: '#ECFDF5', borderRadius: 10, alignItems: 'center', paddingVertical: 10 },
+  navigateBtnText: { color: '#047857', fontSize: 12, fontFamily: 'Outfit_700Bold' },
+  actionDisabled: { backgroundColor: '#F1F5F9' },
+  actionDisabledText: { color: '#94A3B8' },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.5)', justifyContent: 'center', padding: 20 },
   modalCard: { backgroundColor: '#fff', borderRadius: 20, padding: 16, elevation: 10 },
   modalTitle: { fontSize: 18, color: '#0F172A', fontFamily: 'Outfit_700Bold' },
