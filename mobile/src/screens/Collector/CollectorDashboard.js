@@ -7,12 +7,12 @@ import {
   StyleSheet, 
   ActivityIndicator, 
   Alert,
+  Image,
   Linking,
   Modal,
   Platform,
   Dimensions
 } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
 import { useDispatch, useSelector } from 'react-redux';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,7 +21,6 @@ import client from '../../api/client';
 import { logout } from '../../redux/authSlice';
 import { COLORS } from '../../utils/constants';
 import { useRealtime } from '../../context/RealtimeContext';
-import * as Location from 'expo-location';
 
 const { width } = Dimensions.get('window');
 
@@ -114,6 +113,13 @@ const CollectorDashboard = ({ navigation }) => {
   const closePreview = () => {
     setPreviewTask(null);
     setPreviewCoords(null);
+  };
+
+  const getStaticMapUrl = (coords, title = 'Destination') => {
+    if (!coords) return null;
+
+    const label = encodeURIComponent(title);
+    return `https://staticmap.openstreetmap.de/staticmap.php?center=${coords.lat},${coords.lng}&zoom=15&size=700x420&markers=${coords.lat},${coords.lng},red-pushpin&maptype=mapnik&label=${label}`;
   };
 
   const renderItem = ({ item }) => {
@@ -220,24 +226,13 @@ const CollectorDashboard = ({ navigation }) => {
             </Text>
 
             {previewCoords && (
-              <MapView
-                style={styles.previewMap}
-                initialRegion={{
-                  latitude: previewCoords.lat,
-                  longitude: previewCoords.lng,
-                  latitudeDelta: 0.01,
-                  longitudeDelta: 0.01
-                }}
-              >
-                <Marker
-                  coordinate={{
-                    latitude: previewCoords.lat,
-                    longitude: previewCoords.lng
-                  }}
-                  title={previewTask?.title || 'Destination'}
-                  description={previewTask?.location?.address || 'Task destination'}
+              <View style={styles.previewMapFrame}>
+                <Image
+                  source={{ uri: getStaticMapUrl(previewCoords, previewTask?.title || 'Destination') }}
+                  style={styles.previewMap}
+                  resizeMode="cover"
                 />
-              </MapView>
+              </View>
             )}
 
             <View style={styles.modalActions}>
@@ -303,7 +298,8 @@ const styles = StyleSheet.create({
   modalCard: { backgroundColor: '#fff', borderRadius: 20, padding: 16, elevation: 10 },
   modalTitle: { fontSize: 18, color: '#0F172A', fontFamily: 'Outfit_700Bold' },
   modalSubtitle: { marginTop: 4, marginBottom: 12, color: '#64748B', fontSize: 13, fontFamily: 'Inter_400Regular' },
-  previewMap: { width: '100%', height: 220, borderRadius: 14, overflow: 'hidden' },
+  previewMapFrame: { width: '100%', height: 220, borderRadius: 14, overflow: 'hidden', backgroundColor: '#E2E8F0' },
+  previewMap: { width: '100%', height: '100%' },
   modalActions: { marginTop: 14, flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
   modalBtnOutline: { flex: 1, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
   modalBtnOutlineText: { color: '#334155', fontSize: 13, fontFamily: 'Outfit_600SemiBold' },

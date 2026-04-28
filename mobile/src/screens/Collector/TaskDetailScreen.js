@@ -13,9 +13,7 @@ import {
   Platform,
   Dimensions
 } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
 import * as ImagePicker from 'expo-image-picker';
-import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Camera, MapPin, CheckCircle2 } from 'lucide-react-native';
 import client from '../../api/client';
@@ -30,10 +28,6 @@ const TaskDetailScreen = ({ route, navigation }) => {
   const [image, setImage] = useState(null);
   const [note, setNote] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [isTracking, setIsTracking] = useState(false);
-  const [currentPosition, setCurrentPosition] = useState(null);
-  const [trackingError, setTrackingError] = useState('');
-  const [trackingDistanceKm, setTrackingDistanceKm] = useState(null);
   const { revision } = useRealtime();
 
   const refreshTaskState = async () => {
@@ -121,87 +115,6 @@ const TaskDetailScreen = ({ route, navigation }) => {
     return { lat, lng };
   };
 
-  const calculateDistanceKm = (origin, destination) => {
-    if (!origin || !destination) return null;
-
-    const toRadians = (value) => (value * Math.PI) / 180;
-    const earthRadiusKm = 6371;
-    const latDelta = toRadians(destination.lat - origin.lat);
-    const lngDelta = toRadians(destination.lng - origin.lng);
-
-    const a =
-      Math.sin(latDelta / 2) * Math.sin(latDelta / 2) +
-      Math.cos(toRadians(origin.lat)) *
-        Math.cos(toRadians(destination.lat)) *
-        Math.sin(lngDelta / 2) *
-        Math.sin(lngDelta / 2);
-
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return earthRadiusKm * c;
-  };
-
-  useEffect(() => {
-    let locationSubscription;
-
-    const startTracking = async () => {
-      const destination = resolveTaskCoordinates();
-      if (!destination) {
-        setTrackingError('Destination coordinates are missing for this task.');
-        return;
-      }
-
-      const permission = await Location.requestForegroundPermissionsAsync();
-      if (permission.status !== 'granted') {
-        setTrackingError('Location permission is required for live map tracking.');
-        return;
-      }
-
-      setTrackingError('');
-      setIsTracking(true);
-
-      const initialLocation = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-
-      const initialPoint = {
-        lat: initialLocation.coords.latitude,
-        lng: initialLocation.coords.longitude,
-      };
-      setCurrentPosition(initialPoint);
-      setTrackingDistanceKm(calculateDistanceKm(initialPoint, destination));
-
-      locationSubscription = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.Balanced,
-          timeInterval: 5000,
-          distanceInterval: 10,
-        },
-        (position) => {
-          const point = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          };
-
-          setCurrentPosition(point);
-          setTrackingDistanceKm(calculateDistanceKm(point, destination));
-        }
-      );
-    };
-
-    startTracking().catch((error) => {
-      console.error('Live tracking error:', error);
-      setTrackingError('Unable to start live tracking right now.');
-      setIsTracking(false);
-    });
-
-    return () => {
-      if (locationSubscription) {
-        locationSubscription.remove();
-      }
-      setIsTracking(false);
-    };
-  }, [taskState._id]);
-
   const handleNavigate = async () => {
     const coords = resolveTaskCoordinates();
 
@@ -227,19 +140,12 @@ const TaskDetailScreen = ({ route, navigation }) => {
 
   const destinationCoords = resolveTaskCoordinates();
 
-  const trackingPoints = [];
-  if (currentPosition) {
-    trackingPoints.push({
-      latitude: currentPosition.lat,
-      longitude: currentPosition.lng,
-    });
-  }
-  if (destinationCoords) {
-    trackingPoints.push({
-      latitude: destinationCoords.lat,
-      longitude: destinationCoords.lng,
-    });
-  }
+  const getStaticMapUrl = (coords, title = 'Destination') => {
+    if (!coords) return null;
+
+    const label = encodeURIComponent(title);
+    return `https://staticmap.openstreetmap.de/staticmap.php?center=${coords.lat},${coords.lng}&zoom=15&size=700x420&markers=${coords.lat},${coords.lng},red-pushpin&maptype=mapnik&label=${label}`;
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -285,69 +191,20 @@ const TaskDetailScreen = ({ route, navigation }) => {
           </View>
 
           <View style={styles.liveMapSection}>
-            <Text style={styles.liveMapTitle}>Live Map Tracking</Text>
+            <Text style={styles.liveMapTitle}>Map Preview</Text>
             <Text style={styles.liveMapMeta}>
               {destinationCoords
                 ? taskState.location?.address || 'Task destination'
                 : 'Location unavailable for this task'}
             </Text>
-
-            {trackingError ? <Text style={styles.trackingErrorText}>{trackingError}</Text> : null}
-
-            <View style={styles.trackingInfoRow}>
-              <View style={styles.trackingBadge}>
-                <Text style={styles.trackingBadgeLabel}>Tracking</Text>
-                <Text style={styles.trackingBadgeValue}>{isTracking ? 'LIVE' : 'OFF'}</Text>
-              </View>
-              <View style={styles.trackingBadge}>
-                <Text style={styles.trackingBadgeLabel}>Distance</Text>
-                <Text style={styles.trackingBadgeValue}>
-                  {trackingDistanceKm != null ? `${trackingDistanceKm.toFixed(2)} km` : '--'}
-                </Text>
-              </View>
-            </View>
-
             {destinationCoords ? (
-              <MapView
-                style={styles.inlineMap}
-                initialRegion={{
-                  latitude: destinationCoords.lat,
-                  longitude: destinationCoords.lng,
-                  latitudeDelta: 0.02,
-                  longitudeDelta: 0.02,
-                }}
-                showsUserLocation
-                showsMyLocationButton
-              >
-                <Marker
-                  coordinate={{
-                    latitude: destinationCoords.lat,
-                    longitude: destinationCoords.lng,
-                  }}
-                  title={taskState.title || 'Destination'}
-                  description={taskState.location?.address || 'Task destination'}
+              <View style={styles.inlineMapFrame}>
+                <Image
+                  source={{ uri: getStaticMapUrl(destinationCoords, taskState.title || 'Destination') }}
+                  style={styles.inlineMap}
+                  resizeMode="cover"
                 />
-
-                {currentPosition ? (
-                  <Marker
-                    coordinate={{
-                      latitude: currentPosition.lat,
-                      longitude: currentPosition.lng,
-                    }}
-                    pinColor="#10B981"
-                    title="Current position"
-                    description="Collector live location"
-                  />
-                ) : null}
-
-                {trackingPoints.length === 2 ? (
-                  <Polyline
-                    coordinates={trackingPoints}
-                    strokeColor="#22C55E"
-                    strokeWidth={4}
-                  />
-                ) : null}
-              </MapView>
+              </View>
             ) : (
               <View style={styles.mapFallbackBox}>
                 <Text style={styles.mapFallbackText}>Unable to load map preview for this task.</Text>
@@ -434,12 +291,8 @@ const styles = StyleSheet.create({
   liveMapSection: { marginTop: 18, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#E2E8F0' },
   liveMapTitle: { fontSize: 16, color: '#0F172A', fontFamily: 'Outfit_700Bold' },
   liveMapMeta: { marginTop: 4, marginBottom: 10, color: '#64748B', fontSize: 13, fontFamily: 'Inter_400Regular' },
-  trackingInfoRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  trackingBadge: { flex: 1, backgroundColor: '#F8FAFC', borderRadius: 12, paddingVertical: 8, paddingHorizontal: 10, borderWidth: 1, borderColor: '#E2E8F0' },
-  trackingBadgeLabel: { fontSize: 11, color: '#64748B', fontFamily: 'Inter_400Regular' },
-  trackingBadgeValue: { marginTop: 2, fontSize: 13, color: '#0F172A', fontFamily: 'Outfit_700Bold' },
-  trackingErrorText: { marginBottom: 10, color: '#B91C1C', fontSize: 12, fontFamily: 'Inter_400Regular' },
-  inlineMap: { width: '100%', height: 230, borderRadius: 14, overflow: 'hidden' },
+  inlineMapFrame: { width: '100%', height: 230, borderRadius: 14, overflow: 'hidden', backgroundColor: '#E2E8F0' },
+  inlineMap: { width: '100%', height: '100%' },
   mapFallbackBox: { height: 120, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' },
   mapFallbackText: { color: '#64748B', fontSize: 13, fontFamily: 'Inter_400Regular' },
   completionSection: { paddingHorizontal: 25 },
