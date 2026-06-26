@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { adminAPI } from '../../services/api';
+import ProfileCard from '../../components/dashboard/ProfileCard';
 import './AdminDashboard.css';
 
 const AdminDashboard = () => {
@@ -293,6 +294,10 @@ const AdminDashboard = () => {
             Welcome, <strong>{user?.name}</strong>
           </div>
         </div>
+      </div>
+
+      <div className="dashboard-profile-block">
+        <ProfileCard user={user} />
       </div>
 
       {/* Stats Cards */}

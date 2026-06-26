@@ -9,6 +9,7 @@ const {
   resendOTP,
   forgotPassword,
   resetPassword,
+  changePassword,
   getMe
 } = require('../controllers/authController.js');
 const { protect } = require('../middleware/auth.js');
@@ -83,6 +84,15 @@ const resetPasswordValidation = [
     .isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
 ];
 
+// Change password validation
+const changePasswordValidation = [
+  body('oldPassword')
+    .notEmpty().withMessage('Old password is required'),
+  body('newPassword')
+    .notEmpty().withMessage('New password is required')
+    .isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
+];
+
 // Public routes
 router.post('/register', registerValidation, handleValidationErrors, register);
 router.post('/verify-otp', otpValidation, handleValidationErrors, verifyOTP);
@@ -90,6 +100,7 @@ router.post('/login', loginValidation, handleValidationErrors, login);
 router.post('/resend-otp', [body('email').isEmail()], handleValidationErrors, resendOTP);
 router.post('/forgot-password', [body('email').isEmail()], handleValidationErrors, forgotPassword);
 router.post('/reset-password', resetPasswordValidation, handleValidationErrors, resetPassword);
+router.patch('/change-password', protect, changePasswordValidation, handleValidationErrors, changePassword);
 
 // Protected routes
 router.get('/me', protect, getMe);

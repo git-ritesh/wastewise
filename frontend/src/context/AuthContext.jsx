@@ -135,6 +135,19 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Change Password
+  const changePassword = async (oldPassword, newPassword) => {
+    setError(null);
+    try {
+      const response = await authAPI.changePassword({ oldPassword, newPassword });
+      return response.data;
+    } catch (err) {
+      const message = err.response?.data?.message || 'Password change failed';
+      setError(message);
+      throw new Error(message);
+    }
+  };
+
   // Logout
   const logout = () => {
     localStorage.removeItem('token');
@@ -155,6 +168,7 @@ export const AuthProvider = ({ children }) => {
     resendOTP,
     forgotPassword,
     resetPassword,
+    changePassword,
     logout,
     getDashboardPath,
     clearError: () => setError(null)

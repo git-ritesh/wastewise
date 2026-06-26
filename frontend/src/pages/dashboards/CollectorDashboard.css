@@ -53,6 +53,10 @@
   font-size: 1.5rem;
 }
 
+.dashboard-profile-block {
+  margin-bottom: 2rem;
+}
+
 /* Stats Grid */
 .dashboard-grid {
   display: grid;

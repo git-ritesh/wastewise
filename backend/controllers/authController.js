@@ -191,7 +191,10 @@ const login = async (req, res) => {
           name: user.name,
           email: user.email,
           phone: user.phone,
-          role: user.role
+          role: user.role,
+          avatar: user.avatar,
+          address: user.address,
+          createdAt: user.createdAt
         }
       }
     });
@@ -334,6 +337,48 @@ const resetPassword = async (req, res) => {
   }
 };
 
+// @desc    Change password while authenticated
+// @route   PATCH /api/auth/change-password
+// @access  Private
+const changePassword = async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+
+    const user = await User.findById(req.user.id).select('+password');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const isMatch = await user.comparePassword(oldPassword);
+    if (!isMatch) {
+      return res.status(400).json({
+        success: false,
+        message: 'Old password is incorrect'
+      });
+    }
+
+    user.password = newPassword;
+    user.resetPasswordOtp = undefined;
+    user.resetPasswordOtpExpiry = undefined;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Password changed successfully'
+    });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while changing password'
+    });
+  }
+};
+
 // @desc    Get current user
 // @route   GET /api/auth/me
 // @access  Private
@@ -351,6 +396,8 @@ const getMe = async (req, res) => {
         role: user.role,
         isVerified: user.isVerified,
         rewardPoints: user.rewardPoints,
+        avatar: user.avatar,
+        address: user.address,
         createdAt: user.createdAt
       }
     });
@@ -370,5 +417,6 @@ module.exports = {
   resendOTP,
   forgotPassword,
   resetPassword,
+  changePassword,
   getMe
 };

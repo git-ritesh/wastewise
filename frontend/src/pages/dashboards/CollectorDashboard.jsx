@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { collectorAPI } from '../../services/api';
+import ProfileCard from '../../components/dashboard/ProfileCard';
 import CollectorLiveMap from '../../components/dashboard/CollectorLiveMap';
 import './CollectorDashboard.css';
 
@@ -170,6 +171,10 @@ const CollectorDashboard = () => {
           <span className="badge-icon">🚛</span>
           Waste Collector
         </div>
+      </div>
+
+      <div className="dashboard-profile-block">
+        <ProfileCard user={user} />
       </div>
 
       {/* Stats Summary (Placeholder for now, could be real API data) */}
